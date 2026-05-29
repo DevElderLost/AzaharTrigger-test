@@ -29,6 +29,7 @@ import org.citra.citra_emu.databinding.ItemBanListBinding
 import org.citra.citra_emu.databinding.ItemButtonNetplayBinding
 import org.citra.citra_emu.databinding.ItemTextNetplayBinding
 import org.citra.citra_emu.dialogs.ChatDialog
+import org.citra.citra_emu.NativeLibrary
 import org.citra.citra_emu.utils.CompatUtils
 import org.citra.citra_emu.utils.GameHelper
 import org.citra.citra_emu.utils.NetPlayManager
@@ -44,6 +45,8 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
         behavior.skipCollapsed = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        NativeLibrary.initMultiplayer()
 
         when {
             NetPlayManager.netPlayIsJoined() -> DialogMultiplayerLobbyBinding.inflate(layoutInflater)
@@ -323,30 +326,32 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 binding.btnConfirm.isEnabled = true
                 binding.btnConfirm.text = activity.getString(R.string.original_button_text)
             } else {
-                Handler(Looper.getMainLooper()).post {
+                Thread {
                     val result = if (isCreateRoom) {
                         NetPlayManager.netPlayCreateRoom(ipAddress, port, username, preferedGameName, preferedGameId, password, roomName, maxPlayers)
                     } else {
                         NetPlayManager.netPlayJoinRoom(ipAddress, port, username, password)
                     }
 
-                    if (result == 0) {
-                        NetPlayManager.setUsername(activity, username)
-                        NetPlayManager.setRoomPort(activity, portStr)
-                        if (!isCreateRoom) NetPlayManager.setRoomAddress(activity, ipAddress)
-                        Toast.makeText(
-                            CitraApplication.appContext,
-                            if (isCreateRoom) R.string.multiplayer_create_room_success
-                            else R.string.multiplayer_join_room_success,
-                            Toast.LENGTH_LONG
-                        ).show()
-                        dialog.dismiss()
-                    } else {
-                        Toast.makeText(activity, R.string.multiplayer_could_not_connect, Toast.LENGTH_LONG).show()
-                        binding.btnConfirm.isEnabled = true
-                        binding.btnConfirm.text = activity.getString(R.string.original_button_text)
+                    Handler(Looper.getMainLooper()).post {
+                        if (result == 0) {
+                            NetPlayManager.setUsername(activity, username)
+                            NetPlayManager.setRoomPort(activity, portStr)
+                            if (!isCreateRoom) NetPlayManager.setRoomAddress(activity, ipAddress)
+                            Toast.makeText(
+                                CitraApplication.appContext,
+                                if (isCreateRoom) R.string.multiplayer_create_room_success
+                                else R.string.multiplayer_join_room_success,
+                                Toast.LENGTH_LONG
+                            ).show()
+                            dialog.dismiss()
+                        } else {
+                            Toast.makeText(activity, R.string.multiplayer_could_not_connect, Toast.LENGTH_LONG).show()
+                            binding.btnConfirm.isEnabled = true
+                            binding.btnConfirm.text = activity.getString(R.string.original_button_text)
+                        }
                     }
-                }
+                }.start()
             }
         }
 
