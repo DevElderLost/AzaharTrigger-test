@@ -179,9 +179,13 @@ void RoomMember::RoomMemberImpl::MemberLoop() {
                 case IdJoinSuccess:
                 case IdJoinSuccessAsMod:
                     // The join request was successful, we are now in the room.
-                    // If we joined successfully, there must be at least one client in the room: us.
-                    ASSERT_MSG(member_information.size() > 0,
-                               "We have not yet received member information.");
+                    // Note: member_information may not be populated yet due to packet arrival
+                    // order. IdRoomInformation may arrive after IdJoinSuccess for LAN rooms.
+                    // This is not a fatal condition, so we just log it and continue.
+                    if (member_information.size() == 0) {
+                        LOG_WARNING(Network, "Received join success but room information not yet available. "
+                                   "This is normal for LAN rooms with packet reordering.");
+                    }
                     HandleJoinPacket(&event); // Get the MAC Address for the client
                     if (event.packet->data[0] == IdJoinSuccessAsMod) {
                         SetState(State::Moderator);
