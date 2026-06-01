@@ -28,12 +28,12 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 die()  { echo -e "${RED}[ERR]${NC} $*"; exit 1; }
 
 # ── Path constants ────────────────────────────────────────────────────────────
-OVERLAY_KT="app/src/main/java/org/citra/citra_emu/overlay/InputOverlay.kt"
-NATIVE_KT="app/src/main/java/org/citra/citra_emu/NativeLibrary.kt"
-SETTINGS_KT="app/src/main/java/org/citra/citra_emu/features/settings/model/Settings.kt"
-OVERLAY_DIR="app/src/main/java/org/citra/citra_emu/overlay"
-SETTINGS_UI_DIR="app/src/main/java/org/citra/citra_emu/features/settings/ui"
-DRAWABLE_DIR="app/src/main/res/drawable"
+OVERLAY_KT="src/android/app/src/main/java/org/citra/citra_emu/overlay/InputOverlay.kt"
+NATIVE_KT="src/android/app/src/main/java/org/citra/citra_emu/NativeLibrary.kt"
+SETTINGS_KT="src/android/app/src/main/java/org/citra/citra_emu/features/settings/model/Settings.kt"
+OVERLAY_DIR="src/android/app/src/main/java/org/citra/citra_emu/overlay"
+SETTINGS_UI_DIR="src/android/app/src/main/java/org/citra/citra_emu/features/settings/ui"
+DRAWABLE_DIR="src/android/app/src/main/res/drawable"
 
 # ── Verify we are in the repo root ───────────────────────────────────────────
 [[ -f "$OVERLAY_KT" ]]   || die "Cannot find $OVERLAY_KT — run from repo root."

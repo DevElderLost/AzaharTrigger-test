@@ -987,6 +987,13 @@ object NativeLibrary {
         const val BUTTON_GPIO14 = 782
         const val BUTTON_SWAP = 800
         const val BUTTON_TURBO = 801
+
+        // Virtual IDs for Combo Buttons (handled in InputOverlay, NOT sent to core)
+        const val BUTTON_COMBO_1 = 900
+        const val BUTTON_COMBO_2 = 901
+        const val BUTTON_COMBO_3 = 902
+        const val BUTTON_COMBO_4 = 903
+        const val BUTTON_COMBO_5 = 904
     }
 
     /**
