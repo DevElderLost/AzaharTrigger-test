@@ -245,7 +245,6 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
         dialog.behavior.skipCollapsed = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-
         val binding = DialogMultiplayerRoomBinding.inflate(LayoutInflater.from(activity))
         dialog.setContentView(binding.root)
 
@@ -287,9 +286,16 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
             val ipAddress = binding.ipAddress.text.toString()
             val username = binding.username.text.toString()
             val portStr = binding.ipPort.text.toString()
-            val preferedGameName = binding.dropdownPreferedGameName.text.toString()
-            val preferedGameId = gameIdList[gameNameList.indexOfFirst { it[0] == preferedGameName }][0]
             val password = binding.password.text.toString()
+
+            // FIX BUG #2: Hanya ambil preferedGameId saat isCreateRoom,
+            // hindari indexOfFirst() mengembalikan -1 saat Join Room
+            val preferedGameName = if (isCreateRoom) binding.dropdownPreferedGameName.text.toString() else ""
+            val preferedGameId: Long = if (isCreateRoom) {
+                val idx = gameNameList.indexOfFirst { it[0] == preferedGameName }
+                if (idx >= 0) gameIdList[idx][0] else 0L
+            } else 0L
+
             val port = portStr.toIntOrNull() ?: run {
                 Toast.makeText(activity, R.string.multiplayer_port_invalid, Toast.LENGTH_LONG).show()
                 binding.btnConfirm.isEnabled = true
@@ -318,30 +324,40 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 binding.btnConfirm.isEnabled = true
                 binding.btnConfirm.text = activity.getString(R.string.original_button_text)
             } else {
-                Handler(Looper.getMainLooper()).post {
+                // FIX BUG #1: Jalankan operasi blocking (netPlayJoinRoom/netPlayCreateRoom)
+                // di background thread, BUKAN di Main Thread.
+                // netPlayJoinRoom bisa memblokir hingga 5000ms → ANR jika di Main Thread.
+                Thread {
                     val result = if (isCreateRoom) {
-                        NetPlayManager.netPlayCreateRoom(ipAddress, port, username, preferedGameName, preferedGameId, password, roomName, maxPlayers)
+                        NetPlayManager.netPlayCreateRoom(
+                            ipAddress, port, username,
+                            preferedGameName, preferedGameId,
+                            password, roomName, maxPlayers
+                        )
                     } else {
                         NetPlayManager.netPlayJoinRoom(ipAddress, port, username, password)
                     }
 
-                    if (result == 0) {
-                        NetPlayManager.setUsername(activity, username)
-                        NetPlayManager.setRoomPort(activity, portStr)
-                        if (!isCreateRoom) NetPlayManager.setRoomAddress(activity, ipAddress)
-                        Toast.makeText(
-                            CitraApplication.appContext,
-                            if (isCreateRoom) R.string.multiplayer_create_room_success
-                            else R.string.multiplayer_join_room_success,
-                            Toast.LENGTH_LONG
-                        ).show()
-                        dialog.dismiss()
-                    } else {
-                        Toast.makeText(activity, R.string.multiplayer_could_not_connect, Toast.LENGTH_LONG).show()
-                        binding.btnConfirm.isEnabled = true
-                        binding.btnConfirm.text = activity.getString(R.string.original_button_text)
+                    // Kembali ke UI thread hanya untuk update tampilan
+                    Handler(Looper.getMainLooper()).post {
+                        if (result == 0) {
+                            NetPlayManager.setUsername(activity, username)
+                            NetPlayManager.setRoomPort(activity, portStr)
+                            if (!isCreateRoom) NetPlayManager.setRoomAddress(activity, ipAddress)
+                            Toast.makeText(
+                                CitraApplication.appContext,
+                                if (isCreateRoom) R.string.multiplayer_create_room_success
+                                else R.string.multiplayer_join_room_success,
+                                Toast.LENGTH_LONG
+                            ).show()
+                            dialog.dismiss()
+                        } else {
+                            Toast.makeText(activity, R.string.multiplayer_could_not_connect, Toast.LENGTH_LONG).show()
+                            binding.btnConfirm.isEnabled = true
+                            binding.btnConfirm.text = activity.getString(R.string.original_button_text)
+                        }
                     }
-                }
+                }.start()
             }
         }
 
@@ -432,6 +448,5 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 notifyItemRemoved(position)
             }
         }
-
     }
 }
