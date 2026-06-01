@@ -182,6 +182,16 @@ class HomeSettingsFragment : Fragment() {
                 { SettingsActivity.launch(requireContext(), Settings.SECTION_THEME, "") }
             ),
             HomeSetting(
+                R.string.combo_button_settings,
+                R.string.combo_button_settings_description,
+                R.drawable.ic_controller,
+                {
+                    exitTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
+                    parentFragmentManager.primaryNavigationFragment?.findNavController()
+                        ?.navigate(R.id.action_homeSettingsFragment_to_comboButtonSettingsFragment)
+                }
+            ),
+            HomeSetting(
                 R.string.about,
                 R.string.about_description,
                 R.drawable.ic_info_outline,

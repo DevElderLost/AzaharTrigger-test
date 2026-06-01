@@ -1036,4 +1036,8 @@
     <string name="multiplayer_no_game">No Games Found</string>
     <string name="multiplayer_prefered_game_name_invalid">You must choose a Preferred Application to host a room.</string>
 
+    <!-- Combo Buttons -->
+    <string name="combo_button_settings">Combo Buttons</string>
+    <string name="combo_button_settings_description">Configure multi-button combo shortcuts for the overlay</string>
+
 </resources>

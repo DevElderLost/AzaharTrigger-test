@@ -1056,13 +1056,14 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
 
     private fun showToggleControlsDialog() {
         val editor = preferences.edit()
-        val enabledButtons = BooleanArray(16)
+        // Indices 0-15  = tombol standar 3DS
+        // Indices 16-20 = Combo Button 1-5
+        val enabledButtons = BooleanArray(21)
         enabledButtons.forEachIndexed { i: Int, _: Boolean ->
-            // Buttons that are disabled by default
             var defaultValue = true
             when (i) {
-                // TODO: Remove these magic numbers
-                6, 7, 12, 13, 14, 15 -> defaultValue = false
+                // Disabled by default: turbo, swap, home, extra, combo buttons
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
             }
             enabledButtons[i] = preferences.getBoolean("buttonToggle$i", defaultValue)
         }
@@ -1073,6 +1074,11 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
                 R.array.n3dsButtons, enabledButtons
             ) { _: DialogInterface?, indexSelected: Int, isChecked: Boolean ->
                 editor.putBoolean("buttonToggle$indexSelected", isChecked)
+                // Sync combo enabled state ke ComboButtonManager
+                if (indexSelected in 16..20) {
+                    val slot = indexSelected - 15  // 16->1, 17->2, ...
+                    org.citra.citra_emu.overlay.ComboButtonManager.setEnabled(slot, isChecked)
+                }
             }
             .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
                 editor.apply()
@@ -1251,14 +1257,18 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
             .apply()
 
         val editor = preferences.edit()
-        for (i in 0 until 16) {
+        for (i in 0 until 21) {
             var defaultValue = true
             when (i) {
-                6, 7, 12, 13, 14, 15 -> defaultValue = false
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
             }
             editor.putBoolean("buttonToggle$i", defaultValue)
         }
         editor.apply()
+        // Reset combo button enabled states
+        for (slot in 1..5) {
+            org.citra.citra_emu.overlay.ComboButtonManager.setEnabled(slot, false)
+        }
 
         binding.surfaceInputOverlay.resetButtonPlacement()
     }
