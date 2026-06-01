@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <deque>
 #include <list>
 #include <mutex>
 #include <set>
@@ -16,6 +18,16 @@
 namespace Network {
 
 constexpr u32 ConnectionTimeoutMs = 5000;
+
+// FIX MEMORY LEAK #3: Batas maksimum antrian paket kiriman.
+// Tanpa batas ini, send_list bisa tumbuh tak terbatas jika game mengirim
+// wifi packet lebih cepat dari ENet bisa flush → memory terus naik → lag/OOM.
+constexpr std::size_t MaxSendQueueSize = 256;
+
+// FIX MEMORY LEAK #4: Ganti std::list → std::deque untuk send_list.
+// std::list mengalokasikan node heap individual per elemen (tiap WifiPacket = alokasi baru).
+// std::deque menggunakan blok memori kontinu → jauh lebih cache-friendly dan
+// mengurangi fragmentasi heap yang menyebabkan lag GC/allocator Android.
 
 class RoomMember::RoomMemberImpl {
 public:
@@ -46,7 +58,8 @@ public:
     /// Thread that receives and dispatches network packets
     std::unique_ptr<std::thread> loop_thread;
     std::mutex send_list_mutex;  ///< Mutex that controls access to the `send_list` variable.
-    std::list<Packet> send_list; ///< A list that stores all packets to send the async
+    // FIX #4: std::deque menggantikan std::list untuk performa alokasi lebih baik
+    std::deque<Packet> send_list;
 
     template <typename T>
     using CallbackSet = std::set<CallbackHandle<T>>;
@@ -158,116 +171,129 @@ bool RoomMember::RoomMemberImpl::IsConnected() const {
 void RoomMember::RoomMemberImpl::MemberLoop() {
     // Receive packets while the connection is open
     while (IsConnected()) {
-        std::lock_guard network_lock(network_mutex);
         ENetEvent event;
-        if (enet_host_service(client, &event, 16) > 0) {
-            switch (event.type) {
-            case ENET_EVENT_TYPE_RECEIVE:
-                switch (event.packet->data[0]) {
-                case IdWifiPacket:
-                    HandleWifiPackets(&event);
-                    break;
-                case IdChatMessage:
-                    HandleChatPacket(&event);
-                    break;
-                case IdStatusMessage:
-                    HandleStatusMessagePacket(&event);
-                    break;
-                case IdRoomInformation:
-                    HandleRoomInformationPacket(&event);
-                    break;
-                case IdJoinSuccess:
-                case IdJoinSuccessAsMod:
-                    // The join request was successful, we are now in the room.
-                    // Note: member_information may not be populated yet due to packet arrival
-                    // order. IdRoomInformation may arrive after IdJoinSuccess for LAN rooms.
-                    // This is not a fatal condition, so we just log it and continue.
-                    if (member_information.size() == 0) {
-                        LOG_WARNING(Network, "Received join success but room information not yet available. "
-                                   "This is normal for LAN rooms with packet reordering.");
-                    }
-                    HandleJoinPacket(&event); // Get the MAC Address for the client
-                    if (event.packet->data[0] == IdJoinSuccessAsMod) {
-                        SetState(State::Moderator);
-                    } else {
-                        SetState(State::Joined);
-                    }
-                    break;
-                case IdModBanListResponse:
-                    HandleModBanListResponsePacket(&event);
-                    break;
-                case IdRoomIsFull:
-                    SetState(State::Idle);
-                    SetError(Error::RoomIsFull);
-                    break;
-                case IdNameCollision:
-                    SetState(State::Idle);
-                    SetError(Error::NameCollision);
-                    break;
-                case IdMacCollision:
-                    SetState(State::Idle);
-                    SetError(Error::MacCollision);
-                    break;
-                case IdConsoleIdCollision:
-                    SetState(State::Idle);
-                    SetError(Error::ConsoleIdCollision);
-                    break;
-                case IdVersionMismatch:
-                    SetState(State::Idle);
-                    SetError(Error::WrongVersion);
-                    break;
-                case IdWrongPassword:
-                    SetState(State::Idle);
-                    SetError(Error::WrongPassword);
-                    break;
-                case IdCloseRoom:
-                    SetState(State::Idle);
-                    SetError(Error::LostConnection);
-                    break;
-                case IdHostKicked:
-                    SetState(State::Idle);
-                    SetError(Error::HostKicked);
-                    break;
-                case IdHostBanned:
-                    SetState(State::Idle);
-                    SetError(Error::HostBanned);
-                    break;
-                case IdModPermissionDenied:
-                    SetError(Error::PermissionDenied);
-                    break;
-                case IdModNoSuchUser:
-                    SetError(Error::NoSuchUser);
-                    break;
-                }
-                enet_packet_destroy(event.packet);
-                break;
-            case ENET_EVENT_TYPE_DISCONNECT:
-                if (state == State::Joined || state == State::Moderator) {
-                    SetState(State::Idle);
-                    SetError(Error::LostConnection);
-                }
-                break;
-            case ENET_EVENT_TYPE_NONE:
-                break;
-            case ENET_EVENT_TYPE_CONNECT:
-                // The ENET_EVENT_TYPE_CONNECT event can not possibly happen here because we're
-                // already connected
-                ASSERT_MSG(false, "Received unexpected connect event while already connected");
-                break;
-            }
-        }
 
-        std::list<Packet> packets;
+        // FIX BUG DISCONNECT #1: Pisahkan scope network_mutex dari operasi send.
+        // Sebelumnya mutex di-hold SELURUH iterasi termasuk send & flush,
+        // menyebabkan game thread (SendWifiPacket) terkunci → buffer overflow → disconnect palsu.
+        {
+            std::lock_guard network_lock(network_mutex);
+            if (enet_host_service(client, &event, 16) > 0) {
+                switch (event.type) {
+                case ENET_EVENT_TYPE_RECEIVE:
+                    switch (event.packet->data[0]) {
+                    case IdWifiPacket:
+                        HandleWifiPackets(&event);
+                        break;
+                    case IdChatMessage:
+                        HandleChatPacket(&event);
+                        break;
+                    case IdStatusMessage:
+                        HandleStatusMessagePacket(&event);
+                        break;
+                    case IdRoomInformation:
+                        HandleRoomInformationPacket(&event);
+                        break;
+                    case IdJoinSuccess:
+                    case IdJoinSuccessAsMod:
+                        // The join request was successful, we are now in the room.
+                        // Note: member_information may not be populated yet due to packet arrival
+                        // order. IdRoomInformation may arrive after IdJoinSuccess for LAN rooms.
+                        // This is not a fatal condition, so we just log it and continue.
+                        if (member_information.size() == 0) {
+                            LOG_WARNING(Network,
+                                        "Received join success but room information not yet "
+                                        "available. This is normal for LAN rooms with packet "
+                                        "reordering.");
+                        }
+                        HandleJoinPacket(&event); // Get the MAC Address for the client
+                        if (event.packet->data[0] == IdJoinSuccessAsMod) {
+                            SetState(State::Moderator);
+                        } else {
+                            SetState(State::Joined);
+                        }
+                        break;
+                    case IdModBanListResponse:
+                        HandleModBanListResponsePacket(&event);
+                        break;
+                    case IdRoomIsFull:
+                        SetState(State::Idle);
+                        SetError(Error::RoomIsFull);
+                        break;
+                    case IdNameCollision:
+                        SetState(State::Idle);
+                        SetError(Error::NameCollision);
+                        break;
+                    case IdMacCollision:
+                        SetState(State::Idle);
+                        SetError(Error::MacCollision);
+                        break;
+                    case IdConsoleIdCollision:
+                        SetState(State::Idle);
+                        SetError(Error::ConsoleIdCollision);
+                        break;
+                    case IdVersionMismatch:
+                        SetState(State::Idle);
+                        SetError(Error::WrongVersion);
+                        break;
+                    case IdWrongPassword:
+                        SetState(State::Idle);
+                        SetError(Error::WrongPassword);
+                        break;
+                    case IdCloseRoom:
+                        SetState(State::Idle);
+                        SetError(Error::LostConnection);
+                        break;
+                    case IdHostKicked:
+                        SetState(State::Idle);
+                        SetError(Error::HostKicked);
+                        break;
+                    case IdHostBanned:
+                        SetState(State::Idle);
+                        SetError(Error::HostBanned);
+                        break;
+                    case IdModPermissionDenied:
+                        SetError(Error::PermissionDenied);
+                        break;
+                    case IdModNoSuchUser:
+                        SetError(Error::NoSuchUser);
+                        break;
+                    }
+                    enet_packet_destroy(event.packet);
+                    break;
+                case ENET_EVENT_TYPE_DISCONNECT:
+                    if (state == State::Joined || state == State::Moderator) {
+                        SetState(State::Idle);
+                        SetError(Error::LostConnection);
+                    }
+                    break;
+                case ENET_EVENT_TYPE_NONE:
+                    break;
+                case ENET_EVENT_TYPE_CONNECT:
+                    // The ENET_EVENT_TYPE_CONNECT event can not possibly happen here because we're
+                    // already connected
+                    ASSERT_MSG(false, "Received unexpected connect event while already connected");
+                    break;
+                }
+            }
+        } // ← FIX #1: network_mutex dilepas di sini, sebelum proses send
+
+        // Ambil dan kirim paket dari antrian (tanpa hold network_mutex)
+        std::deque<Packet> packets;
         {
             std::lock_guard send_list_lock(send_list_mutex);
             packets.swap(send_list);
         }
-        for (const auto& packet : packets) {
+        for (auto& packet : packets) {
             ENetPacket* enetPacket = enet_packet_create(packet.GetData(), packet.GetDataSize(),
                                                         ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(server, 0, enetPacket);
         }
-        enet_host_flush(client);
+        // FIX #1: flush juga dengan scope mutex singkat
+        {
+            std::lock_guard network_lock(network_mutex);
+            enet_host_flush(client);
+        }
     }
     Disconnect();
 };
@@ -278,6 +304,12 @@ void RoomMember::RoomMemberImpl::StartLoop() {
 
 void RoomMember::RoomMemberImpl::Send(Packet&& packet) {
     std::lock_guard lock(send_list_mutex);
+    // FIX MEMORY LEAK #3: Buang paket paling lama jika antrian sudah penuh.
+    // Tanpa ini, jika game mengirim wifi packet lebih cepat dari flush,
+    // send_list tumbuh tak terbatas → RAM terus naik → lag/OOM crash.
+    if (send_list.size() >= MaxSendQueueSize) {
+        send_list.pop_front(); // Buang paket terlama (drop oldest)
+    }
     send_list.push_back(std::move(packet));
 }
 
@@ -320,7 +352,11 @@ void RoomMember::RoomMemberImpl::HandleRoomInformationPacket(const ENetEvent* ev
 
     u32 num_members;
     packet >> num_members;
+    // FIX MEMORY LEAK #5: Tambah shrink_to_fit setelah resize agar kapasitas
+    // vector dikembalikan ke ukuran yang tepat, mencegah memory yang terpakai
+    // saat member banyak tidak dibebaskan saat member berkurang.
     member_information.resize(num_members);
+    member_information.shrink_to_fit();
 
     for (auto& member : member_information) {
         packet >> member.nickname;
@@ -420,8 +456,20 @@ void RoomMember::RoomMemberImpl::HandleModBanListResponsePacket(const ENetEvent*
 
 void RoomMember::RoomMemberImpl::Disconnect() {
     member_information.clear();
+    // FIX MEMORY LEAK #5: Bebaskan kapasitas vector setelah clear
+    member_information.shrink_to_fit();
+
     room_information.member_slots = 0;
     room_information.name.clear();
+
+    // FIX MEMORY LEAK #6: Bersihkan antrian kirim yang tersisa saat disconnect
+    // Tanpa ini, paket yang belum sempat terkirim tetap menempati memori.
+    {
+        std::lock_guard lock(send_list_mutex);
+        send_list.clear();
+        // shrink_to_fit untuk deque membebaskan semua blok memori internal
+        send_list.shrink_to_fit();
+    }
 
     if (!server)
         return;
@@ -575,6 +623,16 @@ void RoomMember::Join(const std::string& nick, const std::string& console_id_has
     ENetEvent event{};
     int net = enet_host_service(room_member_impl->client, &event, ConnectionTimeoutMs);
     if (net > 0 && event.type == ENET_EVENT_TYPE_CONNECT) {
+        // FIX BUG DISCONNECT #2: Set ENet peer timeout agar tidak disconnect
+        // saat ada spike latency pendek pada jaringan LAN/Hotspot lokal.
+        // Default ENet timeout sangat agresif (~500ms), sering false-positive
+        // pada Android WiFi yang bisa spike sesaat saat screen lock, dll.
+        enet_peer_timeout(room_member_impl->server,
+            0,      // timeout_limit: 0 = gunakan default ENet (32 round-trips)
+            4000,   // timeout_minimum: minimal 4 detik sebelum mulai timeout
+            30000   // timeout_maximum: maksimal 30 detik sebelum force disconnect
+        );
+
         room_member_impl->nickname = nick;
         room_member_impl->StartLoop();
         room_member_impl->SendJoinRequest(nick, console_id_hash, preferred_mac, password, token);
