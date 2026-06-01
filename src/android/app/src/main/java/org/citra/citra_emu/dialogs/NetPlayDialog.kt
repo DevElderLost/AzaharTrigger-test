@@ -357,15 +357,18 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
             val username = binding.username.text.toString()
             val portStr = binding.ipPort.text.toString()
             val preferedGameName = binding.dropdownPreferedGameName.text.toString()
-            val preferedGameId = gameIdList[gameNameList.indexOfFirst { it[0] == preferedGameName }][0]
-            val password = binding.password.text.toString()
-            val port = portStr.toIntOrNull() ?: run {
-                Toast.makeText(activity, R.string.multiplayer_port_invalid, Toast.LENGTH_LONG).show()
-                binding.btnConfirm.isEnabled = true
-                binding.btnConfirm.text = activity.getString(R.string.original_button_text)
-                return@setOnClickListener
-            }
-            val roomName = binding.roomName.text.toString()
+                val preferedGameId = if (isCreateRoom) {
+                    val index = gameNameList.indexOfFirst { it[0] == preferedGameName }
+                    if (index == -1) {
+                        Toast.makeText(activity, R.string.multiplayer_prefered_game_name_invalid, Toast.LENGTH_LONG).show()
+                        binding.btnConfirm.isEnabled = true
+                        binding.btnConfirm.text = activity.getString(R.string.original_button_text)
+                        return@setOnClickListener
+                    }
+                    gameIdList[index][0]
+                } else {
+                    0L
+                }
             val maxPlayers = binding.maxPlayers.value.toInt()
 
             if (isCreateRoom && (roomName.length !in 3..20)) {
