@@ -369,7 +369,10 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 } else {
                     0L
                 }
+            val roomName = binding.roomName.text.toString()
+            val password = binding.password.text.toString()
             val maxPlayers = binding.maxPlayers.value.toInt()
+            val port = portStr.toIntOrNull()
 
             if (isCreateRoom && (roomName.length !in 3..20)) {
                 Toast.makeText(activity, R.string.multiplayer_room_name_invalid, Toast.LENGTH_LONG).show()
@@ -385,7 +388,7 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 return@setOnClickListener
             }
 
-            if (ipAddress.length < 7 || username.length < 5) {
+            if (port == null || port !in 1..65535 || ipAddress.length < 7 || username.length < 5) {
                 Toast.makeText(activity, R.string.multiplayer_input_invalid, Toast.LENGTH_LONG).show()
                 binding.btnConfirm.isEnabled = true
                 binding.btnConfirm.text = activity.getString(R.string.original_button_text)
