@@ -597,7 +597,7 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             R.drawable.combo_button_5_pressed,
         )
         for (i in comboIds.indices) {
-            val toggleKey = "buttonToggle${20 + i}"
+            val toggleKey = "buttonToggle${16 + i}"
             if (preferences.getBoolean(toggleKey, false)) {
                 overlayButtons.add(
                     initializeOverlayButton(
