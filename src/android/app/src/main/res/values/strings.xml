@@ -1039,10 +1039,7 @@
     <!-- Combo Buttons -->
     <string name="combo_button_settings">Combo Buttons</string>
     <string name="combo_button_settings_description">Configure multi-button combo shortcuts for the overlay</string>
-
-
-    <!-- Combo Buttons -->
-    <string name="combo_button_none_assigned">(none)</string>
+    <string name="combo_button_none_assigned">(none assigned)</string>
     <string name="combo_clear_all">Clear all</string>
     <string name="combo_button_max_exceeded">Max %d buttons per combo</string>
 </resources>

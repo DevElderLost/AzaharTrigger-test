@@ -582,27 +582,28 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             ComboButtonManager.COMBO_BUTTON_4,
             ComboButtonManager.COMBO_BUTTON_5,
         )
+        val comboDefaultDrawables = intArrayOf(
+            R.drawable.button_combo_1,
+            R.drawable.button_combo_2,
+            R.drawable.button_combo_3,
+            R.drawable.button_combo_4,
+            R.drawable.button_combo_5,
+        )
+        val comboPressedDrawables = intArrayOf(
+            R.drawable.button_combo_1_pressed,
+            R.drawable.button_combo_2_pressed,
+            R.drawable.button_combo_3_pressed,
+            R.drawable.button_combo_4_pressed,
+            R.drawable.button_combo_5_pressed,
+        )
         for (i in comboIds.indices) {
-            val slot = i + 1
             val toggleKey = "buttonToggle${20 + i}"
             if (preferences.getBoolean(toggleKey, false)) {
-                // Set posisi default jika belum ada di prefs
-                val xKey = "${comboIds[i]}-X"
-                val yKey = "${comboIds[i]}-Y"
-                if (!preferences.contains(xKey)) {
-                    val dm = resources.displayMetrics
-                    val defaultXRatios = floatArrayOf(0.07f, 0.14f, 0.21f, 0.07f, 0.14f)
-                    val defaultYRatios = floatArrayOf(0.75f, 0.75f, 0.75f, 0.88f, 0.88f)
-                    preferences.edit()
-                        .putFloat(xKey, defaultXRatios[i] * dm.widthPixels)
-                        .putFloat(yKey, defaultYRatios[i] * dm.heightPixels)
-                        .apply()
-                }
                 overlayButtons.add(
                     initializeOverlayButton(
                         context,
-                        R.drawable.button_turbo,
-                        R.drawable.button_turbo_pressed,
+                        comboDefaultDrawables[i],
+                        comboPressedDrawables[i],
                         comboIds[i],
                         orientation
                     )
@@ -660,6 +661,21 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             if (aButtonPositionPortrait == 0f) {
                 defaultOverlayPortrait()
             }
+        }
+
+        // Set posisi default combo button jika belum pernah di-set
+        // (user yang install sebelum fitur combo ditambahkan tidak punya key ini)
+        val combo1X = preferences.getFloat(
+            "${ComboButtonManager.COMBO_BUTTON_1}-X", -1f
+        )
+        if (combo1X == -1f) {
+            defaultOverlayLandscape()
+        }
+        val combo1PortraitX = preferences.getFloat(
+            "${ComboButtonManager.COMBO_BUTTON_1}-Portrait-X", -1f
+        )
+        if (combo1PortraitX == -1f) {
+            defaultOverlayPortrait()
         }
 
         preferences.edit()

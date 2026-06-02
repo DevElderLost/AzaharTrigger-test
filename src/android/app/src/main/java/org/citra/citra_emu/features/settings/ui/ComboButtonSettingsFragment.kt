@@ -9,7 +9,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
@@ -21,15 +20,23 @@ import org.citra.citra_emu.databinding.ItemComboButtonBinding
 import org.citra.citra_emu.overlay.ComboButtonManager
 
 /**
- * Fragment pengaturan Combo Buttons 1–5.
- * UI menggunakan Material Design konsisten dengan tampilan Azahar lainnya.
- * Toggle show/hide combo di overlay dilakukan melalui "Toggle Controls"
- * di Overlay Options saat emulasi berjalan (buttonToggle20–24).
+ * Fragment untuk mengatur Combo Buttons 1–5.
+ * Setiap slot menampilkan icon combo-nya sendiri dan chip assignment tombol.
+ * Toggle show/hide dilakukan via "Toggle Controls" di Overlay Options.
  */
 class ComboButtonSettingsFragment : Fragment() {
 
     private var _binding: FragmentComboButtonSettingsBinding? = null
     private val binding get() = _binding!!
+
+    // Drawable icon per slot
+    private val comboIcons = intArrayOf(
+        R.drawable.button_combo_1,
+        R.drawable.button_combo_2,
+        R.drawable.button_combo_3,
+        R.drawable.button_combo_4,
+        R.drawable.button_combo_5,
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,14 +56,12 @@ class ComboButtonSettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Setup toolbar dengan back navigation
         binding.toolbar.apply {
             title = getString(R.string.combo_button_settings)
             setNavigationIcon(R.drawable.ic_back)
             setNavigationOnClickListener { findNavController().popBackStack() }
         }
 
-        // Inflate satu card per slot combo
         for (slot in 1..ComboButtonManager.COMBO_COUNT) {
             val cardBinding = ItemComboButtonBinding.inflate(
                 layoutInflater, binding.comboContainer, true
@@ -66,25 +71,13 @@ class ComboButtonSettingsFragment : Fragment() {
     }
 
     private fun bindSlot(card: ItemComboButtonBinding, slot: Int) {
-        // Judul slot
+        // Icon per slot
+        card.comboIcon.setImageResource(comboIcons[slot - 1])
+
+        // Judul
         card.comboTitle.text = "Combo $slot"
 
-        // Label field — isi dengan label tersimpan kalau bukan auto
-        val autoLabel = ComboButtonManager.autoLabel(slot)
-        val savedLabel = ComboButtonManager.getLabelForSlot(slot)
-        if (savedLabel != autoLabel) {
-            card.labelEditText.setText(savedLabel)
-        }
-        card.labelInputLayout.hint = "Label (leave blank for auto: \"$autoLabel\")"
-
-        card.labelEditText.doOnTextChanged { text, _, _, _ ->
-            ComboButtonManager.setLabelForSlot(slot, text.toString())
-            // Update hint auto-label secara live
-            card.labelInputLayout.hint =
-                "Label (kosong = auto: \"${ComboButtonManager.autoLabel(slot)}\")"
-        }
-
-        // Render chips
+        // Chips assignment
         fun refreshChips() {
             card.chipGroup.removeAllViews()
             val assigned = ComboButtonManager.getButtonsForSlot(slot)
@@ -102,13 +95,11 @@ class ComboButtonSettingsFragment : Fragment() {
                             text = ComboButtonManager.buttonShortName(id)
                             isCloseIconVisible = true
                             setOnCloseIconClickListener {
-                                val current = ComboButtonManager.getButtonsForSlot(slot).toMutableList()
+                                val current = ComboButtonManager
+                                    .getButtonsForSlot(slot).toMutableList()
                                 current.remove(id)
                                 ComboButtonManager.setButtonsForSlot(slot, current)
                                 refreshChips()
-                                // Update hint
-                                card.labelInputLayout.hint =
-                                    "Label (kosong = auto: \"${ComboButtonManager.autoLabel(slot)}\")"
                             }
                         }
                     )
@@ -118,7 +109,6 @@ class ComboButtonSettingsFragment : Fragment() {
 
         refreshChips()
 
-        // Tombol edit — buka dialog multi-pilih
         card.btnEdit.setOnClickListener {
             showPickerDialog(slot) { refreshChips() }
         }
@@ -132,7 +122,7 @@ class ComboButtonSettingsFragment : Fragment() {
         val checked    = BooleanArray(names.size) { i -> ids[i] in selected }
 
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Assign buttons — Combo $slot (max ${ComboButtonManager.MAX_BUTTONS_PER_COMBO})")
+            .setTitle("Assign buttons — Combo $slot")
             .setMultiChoiceItems(names, checked) { _, which, isChecked ->
                 val id = ids[which]
                 if (isChecked) {

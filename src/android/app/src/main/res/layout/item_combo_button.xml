@@ -14,41 +14,38 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Header: Judul slot -->
-        <TextView
-            android:id="@+id/combo_title"
+        <!-- Header: icon + judul slot -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textStyle="bold"
-            android:paddingBottom="8dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="12dp">
 
-        <!-- Label field -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/label_input_layout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Label (leave blank for auto)"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_marginBottom="12dp">
+            <ImageView
+                android:id="@+id/combo_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="12dp"
+                android:scaleType="fitCenter" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/label_edit_text"
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/combo_title"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:inputType="text"
-                android:maxLines="1" />
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold" />
 
-        </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
 
         <!-- Assigned buttons label -->
         <TextView
-            android:id="@+id/assigned_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Assigned buttons:"
+            android:text="Assigned buttons (max 4):"
             android:textAppearance="?attr/textAppearanceLabelMedium"
-            android:paddingBottom="4dp" />
+            android:paddingBottom="6dp" />
 
         <!-- Chips assigned buttons -->
         <com.google.android.material.chip.ChipGroup
