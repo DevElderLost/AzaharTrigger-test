@@ -127,6 +127,16 @@ class HomeSettingsFragment : Fragment() {
                 { mainActivity.displayMultiplayerDialog() }
             ),
             HomeSetting(
+                R.string.combo_button_settings,
+                R.string.combo_button_settings_description,
+                R.drawable.ic_controller,
+                {
+                    exitTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
+                    parentFragmentManager.primaryNavigationFragment?.findNavController()
+                        ?.navigate(R.id.action_homeSettingsFragment_to_comboButtonSettingsFragment)
+                }
+            ),
+            HomeSetting(
                 R.string.install_game_content,
                 R.string.install_game_content_description,
                 R.drawable.ic_install,
@@ -180,16 +190,6 @@ class HomeSettingsFragment : Fragment() {
                 R.string.theme_and_color_description,
                 R.drawable.ic_palette,
                 { SettingsActivity.launch(requireContext(), Settings.SECTION_THEME, "") }
-            ),
-            HomeSetting(
-                R.string.combo_button_settings,
-                R.string.combo_button_settings_description,
-                R.drawable.ic_controller,
-                {
-                    exitTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
-                    parentFragmentManager.primaryNavigationFragment?.findNavController()
-                        ?.navigate(R.id.action_homeSettingsFragment_to_comboButtonSettingsFragment)
-                }
             ),
             HomeSetting(
                 R.string.about,
