@@ -4,172 +4,160 @@
 
 package org.citra.citra_emu.features.settings.ui
 
-import android.content.Context
-import android.graphics.Typeface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
-import androidx.appcompat.widget.SwitchCompat
+import android.widget.Toast
+import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
-import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.transition.MaterialSharedAxis
+import org.citra.citra_emu.R
+import org.citra.citra_emu.databinding.FragmentComboButtonSettingsBinding
+import org.citra.citra_emu.databinding.ItemComboButtonBinding
 import org.citra.citra_emu.overlay.ComboButtonManager
 
 /**
- * Settings screen for configuring Combo Buttons 1–5.
- *
- * Add to nav_graph.xml:
- *   <fragment
- *       android:id="@+id/comboButtonSettingsFragment"
- *       android:name="org.citra.citra_emu.features.settings.ui.ComboButtonSettingsFragment"
- *       android:label="Combo Buttons" />
- *
- * Navigate to it from any fragment:
- *   findNavController().navigate(R.id.action_..._to_comboButtonSettingsFragment)
+ * Fragment pengaturan Combo Buttons 1–5.
+ * UI menggunakan Material Design konsisten dengan tampilan Azahar lainnya.
+ * Toggle show/hide combo di overlay dilakukan melalui "Toggle Controls"
+ * di Overlay Options saat emulasi berjalan (buttonToggle20–24).
  */
 class ComboButtonSettingsFragment : Fragment() {
+
+    private var _binding: FragmentComboButtonSettingsBinding? = null
+    private val binding get() = _binding!!
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enterTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
+        returnTransition = MaterialSharedAxis(MaterialSharedAxis.X, false)
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View = buildScrollView(requireContext())
-
-    // ── Build UI programmatically (no extra layout XML needed) ───────────────
-
-    private fun buildScrollView(ctx: Context): ScrollView {
-        val scroll = ScrollView(ctx).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        }
-        val root = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            val p = 16.dp(ctx)
-            setPadding(p, p, p, p)
-        }
-        for (slot in 1..ComboButtonManager.COMBO_COUNT) {
-            root.addView(buildSlotCard(ctx, slot))
-        }
-        scroll.addView(root)
-        return scroll
+    ): View {
+        _binding = FragmentComboButtonSettingsBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    private fun buildSlotCard(ctx: Context, slot: Int): View {
-        val card = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            val p = 12.dp(ctx); val m = 8.dp(ctx)
-            setPadding(p, p, p, p)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.setMargins(0, 0, 0, m) }
-            setBackgroundResource(android.R.drawable.dialog_holo_light_frame)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Setup toolbar dengan back navigation
+        binding.toolbar.apply {
+            title = getString(R.string.combo_button_settings)
+            setNavigationIcon(R.drawable.ic_arrow_back)
+            setNavigationOnClickListener { findNavController().popBackStack() }
         }
 
-        // Header row: title + enable switch
-        val headerRow = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        val title = TextView(ctx).apply {
-            text = "Combo $slot"
-            textSize = 18f
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val enableSwitch = SwitchCompat(ctx).apply {
-            text = "Show on overlay"
-            isChecked = ComboButtonManager.isEnabled(slot)
-            setOnCheckedChangeListener { _, on -> ComboButtonManager.setEnabled(slot, on) }
-        }
-        headerRow.addView(title)
-        headerRow.addView(enableSwitch)
-        card.addView(headerRow)
-
-        // Label field
-        card.addView(TextView(ctx).apply {
-            text = "Custom label (blank = auto)"
-            textSize = 12f
-            setPadding(0, 8.dp(ctx), 0, 2.dp(ctx))
-        })
-        val labelField = EditText(ctx).apply {
-            val auto = ComboButtonManager.autoLabel(slot)
-            hint = auto
-            setText(ComboButtonManager.getLabelForSlot(slot).takeIf { it != auto } ?: "")
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+        // Inflate satu card per slot combo
+        for (slot in 1..ComboButtonManager.COMBO_COUNT) {
+            val cardBinding = ItemComboButtonBinding.inflate(
+                layoutInflater, binding.comboContainer, true
             )
-            setOnFocusChangeListener { _, focused ->
-                if (!focused) ComboButtonManager.setLabelForSlot(slot, text.toString())
-            }
+            bindSlot(cardBinding, slot)
         }
-        card.addView(labelField)
+    }
 
-        // Chips showing assigned buttons
-        card.addView(TextView(ctx).apply {
-            text = "Assigned (max ${ComboButtonManager.MAX_BUTTONS_PER_COMBO}):"
-            textSize = 13f
-            setPadding(0, 12.dp(ctx), 0, 4.dp(ctx))
-        })
-        val chipGroup = ChipGroup(ctx)
+    private fun bindSlot(card: ItemComboButtonBinding, slot: Int) {
+        // Judul slot
+        card.comboTitle.text = "Combo $slot"
 
+        // Label field — isi dengan label tersimpan kalau bukan auto
+        val autoLabel = ComboButtonManager.autoLabel(slot)
+        val savedLabel = ComboButtonManager.getLabelForSlot(slot)
+        if (savedLabel != autoLabel) {
+            card.labelEditText.setText(savedLabel)
+        }
+        card.labelInputLayout.hint = "Label (kosong = auto: \"$autoLabel\")"
+
+        card.labelEditText.doOnTextChanged { text, _, _, _ ->
+            ComboButtonManager.setLabelForSlot(slot, text.toString())
+            // Update hint auto-label secara live
+            card.labelInputLayout.hint =
+                "Label (kosong = auto: \"${ComboButtonManager.autoLabel(slot)}\")"
+        }
+
+        // Render chips
         fun refreshChips() {
-            chipGroup.removeAllViews()
+            card.chipGroup.removeAllViews()
             val assigned = ComboButtonManager.getButtonsForSlot(slot)
             if (assigned.isEmpty()) {
-                chipGroup.addView(Chip(ctx).apply { text = "(none)" })
+                card.chipGroup.addView(
+                    Chip(requireContext()).apply {
+                        text = getString(R.string.combo_button_none_assigned)
+                        isEnabled = false
+                    }
+                )
             } else {
                 assigned.forEach { id ->
-                    chipGroup.addView(Chip(ctx).apply {
-                        text = ComboButtonManager.buttonShortName(id)
-                    })
+                    card.chipGroup.addView(
+                        Chip(requireContext()).apply {
+                            text = ComboButtonManager.buttonShortName(id)
+                            isCloseIconVisible = true
+                            setOnCloseIconClickListener {
+                                val current = ComboButtonManager.getButtonsForSlot(slot).toMutableList()
+                                current.remove(id)
+                                ComboButtonManager.setButtonsForSlot(slot, current)
+                                refreshChips()
+                                // Update hint
+                                card.labelInputLayout.hint =
+                                    "Label (kosong = auto: \"${ComboButtonManager.autoLabel(slot)}\")"
+                            }
+                        }
+                    )
                 }
             }
-            labelField.hint = ComboButtonManager.autoLabel(slot)
         }
 
         refreshChips()
-        card.addView(chipGroup)
 
-        // Edit button → dialog
-        card.addView(Button(ctx).apply {
-            text = "Edit buttons…"
-            setOnClickListener { showPickerDialog(ctx, slot, ::refreshChips) }
-        })
-
-        return card
+        // Tombol edit — buka dialog multi-pilih
+        card.btnEdit.setOnClickListener {
+            showPickerDialog(slot) { refreshChips() }
+        }
     }
 
-    private fun showPickerDialog(ctx: Context, slot: Int, onDone: () -> Unit) {
+    private fun showPickerDialog(slot: Int, onDone: () -> Unit) {
         val assignable = ComboButtonManager.assignableButtons
         val names      = assignable.map { it.first }.toTypedArray()
         val ids        = assignable.map { it.second }
         val selected   = ComboButtonManager.getButtonsForSlot(slot).toMutableSet()
         val checked    = BooleanArray(names.size) { i -> ids[i] in selected }
 
-        MaterialAlertDialogBuilder(ctx)
-            .setTitle("Assign buttons — Combo $slot")
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Assign tombol — Combo $slot (maks ${ComboButtonManager.MAX_BUTTONS_PER_COMBO})")
             .setMultiChoiceItems(names, checked) { _, which, isChecked ->
                 val id = ids[which]
                 if (isChecked) {
                     if (selected.size >= ComboButtonManager.MAX_BUTTONS_PER_COMBO) {
                         checked[which] = false
                         Toast.makeText(
-                            ctx,
-                            "Max ${ComboButtonManager.MAX_BUTTONS_PER_COMBO} buttons",
+                            requireContext(),
+                            getString(
+                                R.string.combo_button_max_exceeded,
+                                ComboButtonManager.MAX_BUTTONS_PER_COMBO
+                            ),
                             Toast.LENGTH_SHORT
                         ).show()
-                    } else selected.add(id)
-                } else selected.remove(id)
+                    } else {
+                        selected.add(id)
+                    }
+                } else {
+                    selected.remove(id)
+                }
             }
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 ComboButtonManager.setButtonsForSlot(slot, selected.toList())
                 onDone()
             }
-            .setNeutralButton("Clear all") { _, _ ->
+            .setNeutralButton(R.string.combo_clear_all) { _, _ ->
                 ComboButtonManager.setButtonsForSlot(slot, emptyList())
                 onDone()
             }
@@ -177,6 +165,8 @@ class ComboButtonSettingsFragment : Fragment() {
             .show()
     }
 
-    private fun Int.dp(ctx: Context) =
-        (this * ctx.resources.displayMetrics.density).toInt()
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
 }

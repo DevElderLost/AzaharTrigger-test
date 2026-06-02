@@ -1040,4 +1040,9 @@
     <string name="combo_button_settings">Combo Buttons</string>
     <string name="combo_button_settings_description">Configure multi-button combo shortcuts for the overlay</string>
 
+
+    <!-- Combo Buttons -->
+    <string name="combo_button_none_assigned">(tidak ada)</string>
+    <string name="combo_clear_all">Hapus semua</string>
+    <string name="combo_button_max_exceeded">Maks %d tombol per combo</string>
 </resources>
