@@ -585,7 +585,7 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
         for (i in comboIds.indices) {
             val slot = i + 1
             val toggleKey = "buttonToggle${20 + i}"
-            if (preferences.getBoolean(toggleKey, false) && ComboButtonManager.isEnabled(slot)) {
+            if (preferences.getBoolean(toggleKey, false)) {
                 // Set posisi default jika belum ada di prefs
                 val xKey = "${comboIds[i]}-X${orientation}"
                 val yKey = "${comboIds[i]}-Y${orientation}"
