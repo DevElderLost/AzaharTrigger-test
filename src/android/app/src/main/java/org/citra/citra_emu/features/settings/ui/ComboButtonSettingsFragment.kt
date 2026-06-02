@@ -75,7 +75,7 @@ class ComboButtonSettingsFragment : Fragment() {
         if (savedLabel != autoLabel) {
             card.labelEditText.setText(savedLabel)
         }
-        card.labelInputLayout.hint = "Label (kosong = auto: \"$autoLabel\")"
+        card.labelInputLayout.hint = "Label (leave blank for auto: \"$autoLabel\")"
 
         card.labelEditText.doOnTextChanged { text, _, _, _ ->
             ComboButtonManager.setLabelForSlot(slot, text.toString())
@@ -132,7 +132,7 @@ class ComboButtonSettingsFragment : Fragment() {
         val checked    = BooleanArray(names.size) { i -> ids[i] in selected }
 
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Assign tombol — Combo $slot (maks ${ComboButtonManager.MAX_BUTTONS_PER_COMBO})")
+            .setTitle("Assign buttons — Combo $slot (max ${ComboButtonManager.MAX_BUTTONS_PER_COMBO})")
             .setMultiChoiceItems(names, checked) { _, which, isChecked ->
                 val id = ids[which]
                 if (isChecked) {

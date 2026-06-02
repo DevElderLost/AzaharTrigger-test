@@ -28,7 +28,7 @@
             android:id="@+id/label_input_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Label (kosong = auto)"
+            android:hint="Label (leave blank for auto)"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_marginBottom="12dp">
 
@@ -46,7 +46,7 @@
             android:id="@+id/assigned_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Tombol yang diassign:"
+            android:text="Assigned buttons:"
             android:textAppearance="?attr/textAppearanceLabelMedium"
             android:paddingBottom="4dp" />
 
@@ -62,7 +62,7 @@
             android:id="@+id/btn_edit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Pilih Tombol..."
+            android:text="Select Buttons..."
             style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
     </LinearLayout>
