@@ -587,8 +587,8 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             val toggleKey = "buttonToggle${20 + i}"
             if (preferences.getBoolean(toggleKey, false)) {
                 // Set posisi default jika belum ada di prefs
-                val xKey = "${comboIds[i]}-X${orientation}"
-                val yKey = "${comboIds[i]}-Y${orientation}"
+                val xKey = "${comboIds[i]}-X"
+                val yKey = "${comboIds[i]}-Y"
                 if (!preferences.contains(xKey)) {
                     val dm = resources.displayMetrics
                     val defaultXRatios = floatArrayOf(0.07f, 0.14f, 0.21f, 0.07f, 0.14f)
