@@ -586,11 +586,23 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             val slot = i + 1
             val toggleKey = "buttonToggle${20 + i}"
             if (preferences.getBoolean(toggleKey, false) && ComboButtonManager.isEnabled(slot)) {
+                // Set posisi default jika belum ada di prefs
+                val xKey = "${comboIds[i]}-X${orientation}"
+                val yKey = "${comboIds[i]}-Y${orientation}"
+                if (!preferences.contains(xKey)) {
+                    val dm = resources.displayMetrics
+                    val defaultXRatios = floatArrayOf(0.07f, 0.14f, 0.21f, 0.07f, 0.14f)
+                    val defaultYRatios = floatArrayOf(0.75f, 0.75f, 0.75f, 0.88f, 0.88f)
+                    preferences.edit()
+                        .putFloat(xKey, defaultXRatios[i] * dm.widthPixels)
+                        .putFloat(yKey, defaultYRatios[i] * dm.heightPixels)
+                        .apply()
+                }
                 overlayButtons.add(
                     initializeOverlayButton(
                         context,
-                        R.drawable.button_combo,
-                        R.drawable.button_combo_pressed,
+                        R.drawable.button_turbo,
+                        R.drawable.button_turbo_pressed,
                         comboIds[i],
                         orientation
                     )
