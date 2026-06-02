@@ -52,7 +52,7 @@ class ComboButtonSettingsFragment : Fragment() {
         // Setup toolbar dengan back navigation
         binding.toolbar.apply {
             title = getString(R.string.combo_button_settings)
-            setNavigationIcon(R.drawable.ic_arrow_back)
+            setNavigationIcon(R.drawable.ic_back)
             setNavigationOnClickListener { findNavController().popBackStack() }
         }
 
