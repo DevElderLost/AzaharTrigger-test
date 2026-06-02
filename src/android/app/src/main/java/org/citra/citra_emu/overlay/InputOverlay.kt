@@ -583,18 +583,18 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             ComboButtonManager.COMBO_BUTTON_5,
         )
         val comboDefaultDrawables = intArrayOf(
-            R.drawable.button_combo_1,
-            R.drawable.button_combo_2,
-            R.drawable.button_combo_3,
-            R.drawable.button_combo_4,
-            R.drawable.button_combo_5,
+            R.drawable.combo_button_1,
+            R.drawable.combo_button_2,
+            R.drawable.combo_button_3,
+            R.drawable.combo_button_4,
+            R.drawable.combo_button_5,
         )
         val comboPressedDrawables = intArrayOf(
-            R.drawable.button_combo_1_pressed,
-            R.drawable.button_combo_2_pressed,
-            R.drawable.button_combo_3_pressed,
-            R.drawable.button_combo_4_pressed,
-            R.drawable.button_combo_5_pressed,
+            R.drawable.combo_button_1_pressed,
+            R.drawable.combo_button_2_pressed,
+            R.drawable.combo_button_3_pressed,
+            R.drawable.combo_button_4_pressed,
+            R.drawable.combo_button_5_pressed,
         )
         for (i in comboIds.indices) {
             val toggleKey = "buttonToggle${20 + i}"

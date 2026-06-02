@@ -31,11 +31,11 @@ class ComboButtonSettingsFragment : Fragment() {
 
     // Drawable icon per slot
     private val comboIcons = intArrayOf(
-        R.drawable.button_combo_1,
-        R.drawable.button_combo_2,
-        R.drawable.button_combo_3,
-        R.drawable.button_combo_4,
-        R.drawable.button_combo_5,
+        R.drawable.combo_button_1,
+        R.drawable.combo_button_2,
+        R.drawable.combo_button_3,
+        R.drawable.combo_button_4,
+        R.drawable.combo_button_5,
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
