@@ -29,15 +29,6 @@ class ComboButtonSettingsFragment : Fragment() {
     private var _binding: FragmentComboButtonSettingsBinding? = null
     private val binding get() = _binding!!
 
-    // Drawable icon per slot
-    private val comboIcons = intArrayOf(
-        R.drawable.combo_button_1,
-        R.drawable.combo_button_2,
-        R.drawable.combo_button_3,
-        R.drawable.combo_button_4,
-        R.drawable.combo_button_5,
-    )
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enterTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
@@ -71,9 +62,6 @@ class ComboButtonSettingsFragment : Fragment() {
     }
 
     private fun bindSlot(card: ItemComboButtonBinding, slot: Int) {
-        // Icon per slot
-        card.comboIcon.setImageResource(comboIcons[slot - 1])
-
         // Judul
         card.comboTitle.text = "Combo $slot"
 

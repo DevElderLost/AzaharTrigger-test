@@ -14,30 +14,14 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Header: icon + judul slot -->
-        <LinearLayout
+        <!-- Header: judul slot saja -->
+        <TextView
+            android:id="@+id/combo_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingBottom="12dp">
-
-            <ImageView
-                android:id="@+id/combo_icon"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="12dp"
-                android:scaleType="fitCenter" />
-
-            <TextView
-                android:id="@+id/combo_title"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textStyle="bold" />
-
-        </LinearLayout>
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textStyle="bold"
+            android:paddingBottom="12dp" />
 
         <!-- Assigned buttons label -->
         <TextView
