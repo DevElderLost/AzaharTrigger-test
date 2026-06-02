@@ -839,6 +839,31 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
                     true
                 }
 
+                R.id.menu_emulation_adjust_scale_combo_1 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_1)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_2 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_2)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_3 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_3)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_4 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_4)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_5 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_5)
+                    true
+                }
+
                 R.id.menu_emulation_adjust_opacity -> {
                     showAdjustOpacityDialog()
                     true
