@@ -1042,4 +1042,9 @@
     <string name="combo_button_none_assigned">(none assigned)</string>
     <string name="combo_clear_all">Clear all</string>
     <string name="combo_button_max_exceeded">Max %d buttons per combo</string>
+    <string name="emulation_combo1_scale">Combo 1 Scale</string>
+    <string name="emulation_combo2_scale">Combo 2 Scale</string>
+    <string name="emulation_combo3_scale">Combo 3 Scale</string>
+    <string name="emulation_combo4_scale">Combo 4 Scale</string>
+    <string name="emulation_combo5_scale">Combo 5 Scale</string>
 </resources>
