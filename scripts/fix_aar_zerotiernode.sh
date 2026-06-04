@@ -1,3 +1,51 @@
+#!/bin/bash
+# fix_aar_zerotiernode.sh — Fix ZeroTierNative.cpp untuk pakai
+# com.zerotier.sockets.ZeroTierNode (API yang benar dari libzt AAR)
+#
+# Cara pakai:
+#   bash scripts/fix_aar_zerotiernode.sh
+
+set -e
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC}   $1"; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+JNI_DIR="$PROJECT_ROOT/src/android/app/src/main/jni"
+
+[ -d "$JNI_DIR" ] || error "JNI dir tidak ditemukan: $JNI_DIR"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix ZeroTierNative.cpp — pakai ZeroTierNode API"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# Cek method yang tersedia di ZeroTierNode via javap
+AAR_FILE="$PROJECT_ROOT/src/android/app/libs/libzt-release.aar"
+if [ -f "$AAR_FILE" ]; then
+    info "Inspect method ZeroTierNode dari AAR..."
+    WORK=$(mktemp -d /tmp/aar_node_XXXXXX)
+    cp "$AAR_FILE" "$WORK/libzt.zip"
+    cd "$WORK" && unzip -q libzt.zip
+    if [ -f "$WORK/classes.jar" ]; then
+        mkdir -p "$WORK/cls"
+        cd "$WORK/cls" && jar xf "$WORK/classes.jar" 2>/dev/null || unzip -q "$WORK/classes.jar"
+        if command -v javap >/dev/null 2>&1; then
+            echo "  Method di ZeroTierNode:"
+            javap -classpath "$WORK/cls" "com.zerotier.sockets.ZeroTierNode" 2>/dev/null | \
+                grep "public\|static" | head -30 || echo "  (javap tidak bisa baca)"
+        fi
+    fi
+    rm -rf "$WORK"
+fi
+
+info "Tulis ulang ZeroTierNative.cpp dengan ZeroTierNode API..."
+
+cat > "/tmp/ZeroTierNative_node.cpp" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 //
@@ -274,3 +322,17 @@ uint64_t    ParseNetworkId(const std::string& s) {
 }
 
 } // namespace ZeroTierNative
+EOF
+
+cp /tmp/ZeroTierNative_node.cpp "$JNI_DIR/ZeroTierNative.cpp"
+success "ZeroTierNative.cpp ditulis ulang dengan ZeroTierNode API"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo -e "${GREEN}  Fix selesai!${NC}"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTierNative pakai ZeroTierNode instance API\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
