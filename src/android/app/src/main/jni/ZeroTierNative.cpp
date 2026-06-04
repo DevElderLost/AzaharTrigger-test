@@ -1,121 +1,138 @@
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
+//
+// ZeroTierNative.cpp — Implementasi via libzt AAR Java API
+// Tidak ada #include <ZeroTierSockets.h> karena AAR tidak expose header C
+// Semua operasi ZeroTier dipanggil via JNI ke Java class di AAR:
+//   com.zerotier.libzt.ZeroTier
+
 #include "ZeroTierNative.h"
 #include "common/logging/log.h"
-#include <ZeroTierSockets.h>
+#include "jni/id_cache.h"
 #include <atomic>
 #include <chrono>
 #include <cstring>
 #include <string>
 #include <thread>
+#include <jni.h>
 
 namespace ZeroTierNative {
 
 static std::atomic<bool> zt_initialized{false};
-static std::atomic<bool> zt_node_online{false};
-static std::atomic<bool> zt_network_ready{false};
-static std::string       zt_storage_path;
+static std::atomic<bool> zt_ready{false};
+static char              zt_assigned_ip[64] = {0};
 static uint64_t          zt_network_id = 0;
-static char              zt_assigned_ip[ZTS_IP_MAX_STR_LEN] = {0};
+static jclass            g_zt_class    = nullptr;
 
-static void ZTEventCallback(void* msgPtr) {
-    const zts_event_msg_t* msg = static_cast<zts_event_msg_t*>(msgPtr);
-    if (!msg) return;
-    switch (msg->event_code) {
-    case ZTS_EVENT_NODE_ONLINE:
-        LOG_INFO(Network, "[ZeroTier] Node online, ID: {:x}", msg->node->node_id);
-        zt_node_online = true;
-        break;
-    case ZTS_EVENT_NODE_OFFLINE:
-        LOG_WARNING(Network, "[ZeroTier] Node offline");
-        zt_node_online   = false;
-        zt_network_ready = false;
-        break;
-    case ZTS_EVENT_NETWORK_READY_IP4:
-        LOG_INFO(Network, "[ZeroTier] Network IPv4 ready");
-        zt_network_ready = true;
-        if (msg->addr) {
-            zts_inet_ntop(ZTS_AF_INET,
-                &(((struct zts_sockaddr_in*)&msg->addr->addr)->sin_addr),
-                zt_assigned_ip, ZTS_IP_MAX_STR_LEN);
-            LOG_INFO(Network, "[ZeroTier] Assigned IP: {}", zt_assigned_ip);
-        }
-        break;
-    case ZTS_EVENT_NETWORK_ACCESS_DENIED:
-        LOG_ERROR(Network, "[ZeroTier] Access denied — node belum diauthorize");
-        break;
-    case ZTS_EVENT_ADDR_ADDED_IP4:
-        if (msg->addr) {
-            zts_inet_ntop(ZTS_AF_INET,
-                &(((struct zts_sockaddr_in*)&msg->addr->addr)->sin_addr),
-                zt_assigned_ip, ZTS_IP_MAX_STR_LEN);
-        }
-        break;
-    default: break;
+static bool EnsureClass(JNIEnv* env) {
+    if (g_zt_class) return true;
+    jclass cls = env->FindClass("com/zerotier/libzt/ZeroTier");
+    if (!cls) {
+        LOG_ERROR(Network, "[ZT] Class com/zerotier/libzt/ZeroTier tidak ditemukan di AAR");
+        return false;
     }
+    g_zt_class = (jclass)env->NewGlobalRef(cls);
+    env->DeleteLocalRef(cls);
+    return true;
 }
 
 ZTResult Init(const std::string& storage_path, uint64_t network_id) {
     if (zt_initialized) return ZTResult::AlreadyRunning;
 
-    zt_storage_path  = storage_path;
-    zt_network_id    = network_id;
-    zt_node_online   = false;
-    zt_network_ready = false;
+    zt_network_id = network_id;
+    zt_ready      = false;
     memset(zt_assigned_ip, 0, sizeof(zt_assigned_ip));
 
-    if (zts_init_set_path(storage_path.c_str()) != ZTS_ERR_OK)
-        return ZTResult::InitFailed;
-    if (zts_init_set_event_handler(&ZTEventCallback) != ZTS_ERR_OK)
-        return ZTResult::InitFailed;
-    if (zts_node_start() != ZTS_ERR_OK)
-        return ZTResult::InitFailed;
+    JNIEnv* env = IDCache::GetEnvForThread();
+    if (!env)                  return ZTResult::InitFailed;
+    if (!EnsureClass(env))     return ZTResult::InitFailed;
 
-    constexpr int STEP_MS = 200;
-    for (int e = 0; e < 15000; e += STEP_MS) {
-        if (zt_node_online) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(STEP_MS));
+    // Panggil ZeroTier.init(storagePath)
+    jmethodID mid_init = env->GetStaticMethodID(
+        g_zt_class, "init", "(Ljava/lang/String;)I");
+    if (!mid_init) {
+        LOG_ERROR(Network, "[ZT] Method ZeroTier.init() tidak ditemukan");
+        return ZTResult::InitFailed;
     }
-    if (!zt_node_online) { zts_node_stop(); return ZTResult::Timeout; }
+    jstring jpath  = env->NewStringUTF(storage_path.c_str());
+    jint    result = env->CallStaticIntMethod(g_zt_class, mid_init, jpath);
+    env->DeleteLocalRef(jpath);
+    if (result != 0) {
+        LOG_ERROR(Network, "[ZT] ZeroTier.init() gagal: {}", (int)result);
+        return ZTResult::InitFailed;
+    }
 
-    if (zts_net_join(network_id) != ZTS_ERR_OK) {
-        zts_node_stop(); return ZTResult::JoinFailed;
+    // Tunggu node online (max 15 detik)
+    jmethodID mid_online = env->GetStaticMethodID(g_zt_class, "isNodeOnline", "()Z");
+    constexpr int STEP = 200;
+    for (int e = 0; e < 15000 && mid_online; e += STEP) {
+        if (env->CallStaticBooleanMethod(g_zt_class, mid_online)) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(STEP));
+    }
+    if (!mid_online || !env->CallStaticBooleanMethod(g_zt_class, mid_online)) {
+        LOG_ERROR(Network, "[ZT] Timeout menunggu node online");
+        return ZTResult::Timeout;
     }
 
-    for (int e = 0; e < 20000; e += STEP_MS) {
-        if (zt_network_ready && strlen(zt_assigned_ip) > 0) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(STEP_MS));
+    // Join network
+    jmethodID mid_join = env->GetStaticMethodID(g_zt_class, "join", "(J)I");
+    if (!mid_join) return ZTResult::JoinFailed;
+    if (env->CallStaticIntMethod(g_zt_class, mid_join, (jlong)network_id) != 0)
+        return ZTResult::JoinFailed;
+
+    // Tunggu IP di-assign (max 20 detik)
+    jmethodID mid_ip = env->GetStaticMethodID(
+        g_zt_class, "getIPv4Address", "(J)Ljava/lang/String;");
+    for (int e = 0; e < 20000 && mid_ip; e += STEP) {
+        jstring jip = (jstring)env->CallStaticObjectMethod(
+            g_zt_class, mid_ip, (jlong)network_id);
+        if (jip) {
+            const char* cip = env->GetStringUTFChars(jip, nullptr);
+            if (cip && strlen(cip) > 6) {
+                strncpy(zt_assigned_ip, cip, sizeof(zt_assigned_ip) - 1);
+                env->ReleaseStringUTFChars(jip, cip);
+                env->DeleteLocalRef(jip);
+                break;
+            }
+            env->ReleaseStringUTFChars(jip, cip);
+            env->DeleteLocalRef(jip);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(STEP));
     }
-    if (!zt_network_ready || strlen(zt_assigned_ip) == 0) {
-        zts_net_leave(network_id); zts_node_stop();
+
+    if (strlen(zt_assigned_ip) == 0) {
+        LOG_ERROR(Network, "[ZT] Timeout IP — pastikan node sudah diauthorize");
         return ZTResult::NetworkNotReady;
     }
 
+    LOG_INFO(Network, "[ZT] Siap! IP: {}", zt_assigned_ip);
     zt_initialized = true;
+    zt_ready       = true;
     return ZTResult::OK;
 }
 
 void Shutdown() {
     if (!zt_initialized) return;
-    if (zt_network_id != 0) zts_net_leave(zt_network_id);
-    zts_node_stop();
-    zt_initialized   = false;
-    zt_node_online   = false;
-    zt_network_ready = false;
-    zt_network_id    = 0;
+    JNIEnv* env = IDCache::GetEnvForThread();
+    if (env && g_zt_class) {
+        if (zt_network_id != 0) {
+            jmethodID m = env->GetStaticMethodID(g_zt_class, "leave", "(J)I");
+            if (m) env->CallStaticIntMethod(g_zt_class, m, (jlong)zt_network_id);
+        }
+        jmethodID m = env->GetStaticMethodID(g_zt_class, "stop", "()I");
+        if (m) env->CallStaticIntMethod(g_zt_class, m);
+    }
+    zt_initialized = false;
+    zt_ready       = false;
+    zt_network_id  = 0;
     memset(zt_assigned_ip, 0, sizeof(zt_assigned_ip));
 }
 
-bool        IsReady()       { return zt_initialized && zt_node_online && zt_network_ready; }
+bool        IsReady()       { return zt_initialized && zt_ready; }
 std::string GetAssignedIP() { return std::string(zt_assigned_ip); }
-
-uint64_t GetNodeID() {
-    if (!zt_node_online) return 0;
-    uint64_t id = 0; zts_node_get_id(&id); return id;
-}
-
-uint64_t ParseNetworkId(const std::string& hex_str) {
-    try { return std::stoull(hex_str, nullptr, 16); } catch (...) { return 0; }
+uint64_t    GetNodeID()     { return 0; }
+uint64_t    ParseNetworkId(const std::string& s) {
+    try { return std::stoull(s, nullptr, 16); } catch (...) { return 0; }
 }
 
 } // namespace ZeroTierNative
