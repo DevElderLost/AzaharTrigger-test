@@ -1,3 +1,35 @@
+#!/bin/bash
+# fix_zerotier_kotlin_only.sh
+# Ganti pendekatan: ZeroTierNode dipanggil langsung dari Kotlin
+# (reflection), tidak melalui C++ JNI sama sekali.
+# Ini jauh lebih sederhana dan tidak ada masalah JVM attach.
+#
+# Cara pakai:
+#   bash scripts/fix_zerotier_kotlin_only.sh
+
+set -e
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC}   $1"; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+UTILS_DIR="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu/utils"
+
+[ -d "$UTILS_DIR" ] || error "Utils dir tidak ditemukan: $UTILS_DIR"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix: ZeroTier langsung dari Kotlin (tanpa C++ JNI)"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# ── Tulis ulang ZeroTierManager.kt ────────────────────────────────
+info "Tulis ulang ZeroTierManager.kt (Kotlin-only approach)..."
+
+cat > "$UTILS_DIR/ZeroTierManager.kt" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 //
@@ -184,3 +216,97 @@ object ZeroTierManager {
     fun isReady()       = state == State.READY
     fun getAssignedIP() = assignedIp
 }
+EOF
+success "ZeroTierManager.kt ditulis ulang (Kotlin reflection)"
+
+# ── Update ZeroTierNative.cpp: stub kosong — tidak dipakai lagi ───
+info "Update ZeroTierNative.cpp menjadi stub..."
+
+JNI_DIR="$PROJECT_ROOT/src/android/app/src/main/jni"
+
+cat > "$JNI_DIR/ZeroTierNative.cpp" << 'EOF'
+// Copyright 2025 AzaharTrigger Project
+// Licensed under GPLv2 or any later version
+//
+// ZeroTierNative.cpp — STUB
+// ZeroTier sekarang dikelola langsung dari Kotlin (ZeroTierManager.kt)
+// menggunakan reflection ke com.zerotier.sockets.ZeroTierNode.
+// File ini hanya menyediakan implementasi kosong agar CMakeLists
+// tidak error saat compile.
+
+#include "ZeroTierNative.h"
+#include "common/logging/log.h"
+
+JavaVM* ZeroTierNative::g_jvm = nullptr;
+
+namespace ZeroTierNative {
+
+ZTResult Init(const std::string&, uint64_t) {
+    // Tidak dipakai — ZeroTier dikelola dari Kotlin
+    LOG_WARNING(Network, "[ZT] ZeroTierNative::Init() dipanggil tapi tidak dipakai");
+    return ZTResult::OK;
+}
+void        Shutdown()       { /* stub */ }
+bool        IsReady()        { return false; }
+std::string GetAssignedIP()  { return ""; }
+uint64_t    GetNodeID()      { return 0; }
+uint64_t    ParseNetworkId(const std::string& s) {
+    try { return std::stoull(s, nullptr, 16); } catch (...) { return 0; }
+}
+
+} // namespace ZeroTierNative
+EOF
+success "ZeroTierNative.cpp dijadikan stub"
+
+# ── Update jni_zt_bridge.cpp — ztInit sekarang return 0 langsung ─
+cat > "$JNI_DIR/jni_zt_bridge.cpp" << 'EOF'
+// Copyright 2025 AzaharTrigger Project
+// Licensed under GPLv2 or any later version
+//
+// jni_zt_bridge.cpp — Bridge stub
+// ZeroTier dikelola dari Kotlin, fungsi ini hanya placeholder
+// agar deklarasi @JvmStatic external fun zt*() di NetPlayManager.kt
+// tidak error saat link.
+
+#include <jni.h>
+#include "ZeroTierNative.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+JNIEXPORT jint JNICALL
+Java_org_citra_citra_1emu_utils_NetPlayManager_ztInit(
+        JNIEnv*, jclass, jstring, jstring) {
+    // Tidak dipakai — ZeroTier dikelola dari Kotlin ZeroTierManager
+    return 0;
+}
+
+JNIEXPORT void JNICALL
+Java_org_citra_citra_1emu_utils_NetPlayManager_ztShutdown(JNIEnv*, jclass) {}
+
+JNIEXPORT jstring JNICALL
+Java_org_citra_citra_1emu_utils_NetPlayManager_ztGetAssignedIP(JNIEnv* env, jclass) {
+    return env->NewStringUTF("");
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_citra_citra_1emu_utils_NetPlayManager_ztIsReady(JNIEnv*, jclass) {
+    return JNI_FALSE;
+}
+
+#ifdef __cplusplus
+}
+#endif
+EOF
+success "jni_zt_bridge.cpp dijadikan stub"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo -e "${GREEN}  Fix selesai!${NC}"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTier via Kotlin reflection, bypass C++ JNI\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
