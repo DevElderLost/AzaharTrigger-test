@@ -1,3 +1,32 @@
+#!/bin/bash
+# fix_zt_final.sh — Fix ZeroTierManager dengan API ZeroTierNode yang benar
+#
+# API yang benar (dari source):
+#   node.initFromStorage(path)        → setup storage
+#   node.initSetEventHandler(handler) → opsional
+#   node.start()                      → mulai node
+#   node.isOnline()                   → cek online
+#   node.join(networkIdLong)          → join network
+#   node.getIPv4Address(networkIdLong) → InetAddress
+#   node.stop()                       → stop node
+#   node.leave(networkIdLong)         → leave network
+#
+# Cara pakai:
+#   bash scripts/fix_zt_final.sh
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+UTILS_DIR="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu/utils"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix Final ZeroTierManager — API ZeroTierNode benar"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+cat > "$UTILS_DIR/ZeroTierManager.kt" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 //
@@ -194,3 +223,15 @@ object ZeroTierManager {
     fun isReady()       = state == State.READY
     fun getAssignedIP() = assignedIp
 }
+EOF
+echo "[OK] ZeroTierManager.kt ditulis ulang dengan API yang benar"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo -e "\033[0;32m  Fix selesai!\033[0m"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTierManager pakai API ZeroTierNode yang benar\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
