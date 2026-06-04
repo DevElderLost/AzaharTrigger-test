@@ -1,3 +1,22 @@
+#!/bin/bash
+# fix_zt_reflection.sh — Fix NoSuchMethodException di ZeroTierManager
+#
+# Cara pakai:
+#   bash scripts/fix_zt_reflection.sh
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+UTILS_DIR="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu/utils"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix ZeroTierManager — reflection yang benar"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+cat > "$UTILS_DIR/ZeroTierManager.kt" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 package org.citra.citra_emu.utils
@@ -208,3 +227,11 @@ object ZeroTierManager {
     fun isReady()       = state == State.READY
     fun getAssignedIP() = assignedIp
 }
+EOF
+echo "[OK] ZeroTierManager.kt ditulis ulang"
+
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTierManager reflection method invoke yang benar\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
