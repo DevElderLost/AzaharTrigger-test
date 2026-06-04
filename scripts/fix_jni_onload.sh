@@ -1,3 +1,42 @@
+#!/bin/bash
+# fix_jni_onload.sh — Fix duplicate JNI_OnLoad
+# Hapus JNI_OnLoad dari ZeroTierNative.cpp, gunakan IDCache
+#
+# Cara pakai:
+#   bash scripts/fix_jni_onload.sh
+
+set -e
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC}   $1"; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+JNI_DIR="$PROJECT_ROOT/src/android/app/src/main/jni"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix: duplicate JNI_OnLoad"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# Cek id_cache.cpp untuk lihat bagaimana JavaVM disimpan
+ID_CACHE_CPP=$(find "$PROJECT_ROOT/src" -name "id_cache.cpp" | head -1)
+if [ -n "$ID_CACHE_CPP" ]; then
+    info "JavaVM di id_cache.cpp:"
+    grep -n "JavaVM\|g_jvm\|s_jvm\|GetJVM\|JNI_OnLoad" "$ID_CACHE_CPP" | head -10
+fi
+
+echo ""
+info "Tulis ulang ZeroTierNative.cpp tanpa JNI_OnLoad..."
+
+ZT_NATIVE="$JNI_DIR/ZeroTierNative.cpp"
+[ -f "$ZT_NATIVE" ] || error "ZeroTierNative.cpp tidak ditemukan: $ZT_NATIVE"
+
+# Tulis file baru ke /tmp dulu lalu pindahkan
+cat > /tmp/ZeroTierNative_new.cpp << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 //
@@ -194,3 +233,17 @@ uint64_t    ParseNetworkId(const std::string& s) {
 }
 
 } // namespace ZeroTierNative
+EOF
+
+cp /tmp/ZeroTierNative_new.cpp "$ZT_NATIVE"
+success "ZeroTierNative.cpp ditulis ulang tanpa JNI_OnLoad"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo -e "${GREEN}  Fix selesai!${NC}"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: hapus JNI_OnLoad duplikat dari ZeroTierNative.cpp\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
