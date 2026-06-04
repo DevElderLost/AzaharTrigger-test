@@ -12,6 +12,7 @@
 #include <network/network_settings.h>
 #include "network/announce_multiplayer_session.h"
 #include "core/hle/service/cfg/cfg.h"
+#include "ZeroTierNative.h"
 
 
 AndroidMultiplayer::AndroidMultiplayer(Core::System& system_,
@@ -143,6 +144,26 @@ bool AndroidMultiplayer::NetworkInit() {
 
     return true;
 }
+
+// ── ZeroTier entry points ─────────────────────────────────────────
+NetPlayStatus AndroidMultiplayer::ZeroTierInit(const std::string& storage_path,
+                                               const std::string& network_id_hex) {
+    if (ZeroTierNative::IsReady()) return NetPlayStatus::NO_ERROR;
+    uint64_t net_id = ZeroTierNative::ParseNetworkId(network_id_hex);
+    if (net_id == 0) return NetPlayStatus::NETWORK_ERROR;
+    auto result = ZeroTierNative::Init(storage_path, net_id);
+    switch (result) {
+        case ZeroTierNative::ZTResult::OK:
+        case ZeroTierNative::ZTResult::AlreadyRunning: return NetPlayStatus::NO_ERROR;
+        case ZeroTierNative::ZTResult::Timeout:
+        case ZeroTierNative::ZTResult::NetworkNotReady: return NetPlayStatus::COULD_NOT_CONNECT;
+        default: return NetPlayStatus::NETWORK_ERROR;
+    }
+}
+void AndroidMultiplayer::ZeroTierShutdown() { ZeroTierNative::Shutdown(); }
+std::string AndroidMultiplayer::ZeroTierGetIP() { return ZeroTierNative::GetAssignedIP(); }
+bool AndroidMultiplayer::ZeroTierIsReady() { return ZeroTierNative::IsReady(); }
+
 
 NetPlayStatus AndroidMultiplayer::NetPlayCreateRoom(const std::string& ipaddress, int port,
                               const std::string& username, const std::string& preferedGameName, const u64 &preferedGameId, const std::string& password,

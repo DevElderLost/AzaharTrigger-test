@@ -226,13 +226,3 @@ endif()
 if (ENABLE_WEB_SERVICE)
     add_subdirectory(web_service)
 endif()
-
-# ── ZeroTier (libzt AAR) — patch oleh apply_cmake_libzt_patch.sh ──────
-# libzt-release.aar ditambahkan via build.gradle (fileTree libs/)
-# CMakeLists hanya perlu tahu source file ZeroTierNative
-target_sources(citra-android PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/android/app/src/main/jni/ZeroTierNative.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/android/app/src/main/jni/ZeroTierNative.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/android/app/src/main/jni/jni_zt_bridge.cpp
-)
-# ── End ZeroTier ───────────────────────────────────────────────────────

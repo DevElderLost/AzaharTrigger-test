@@ -1047,4 +1047,18 @@
     <string name="emulation_combo3_scale">Combo 3 Scale</string>
     <string name="emulation_combo4_scale">Combo 4 Scale</string>
     <string name="emulation_combo5_scale">Combo 5 Scale</string>
+    <!-- ZeroTier -->
+    <string name="zerotier_button_label">ZeroTier</string>
+    <string name="zerotier_network_id_hint">Network ID (16 karakter)</string>
+    <string name="zerotier_network_id_invalid">Network ID harus 16 karakter</string>
+    <string name="zerotier_status_idle">Tidak terhubung. Masukkan Network ID.</string>
+    <string name="zerotier_status_starting">Memulai tunnel ZeroTier2026</string>
+    <string name="zerotier_status_ready">Terhubung 2713  IP: %s</string>
+    <string name="zerotier_status_error">Error: %s</string>
+    <string name="zerotier_status_error_generic">Gagal terhubung. Coba lagi.</string>
+    <string name="zerotier_network_id_helper">Network ID dari my.zerotier.com 2192 Networks</string>
+    <string name="zerotier_btn_connect">Hubungkan</string>
+    <string name="zerotier_btn_reconnect">Hubungkan Ulang</string>
+    <string name="zerotier_btn_disconnect">Putuskan</string>
+    <string name="zerotier_disconnected">ZeroTier diputus</string>
 </resources>

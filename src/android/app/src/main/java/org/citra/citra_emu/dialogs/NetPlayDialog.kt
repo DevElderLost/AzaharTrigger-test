@@ -32,8 +32,11 @@ import org.citra.citra_emu.dialogs.ChatDialog
 import org.citra.citra_emu.utils.CompatUtils
 import org.citra.citra_emu.utils.GameHelper
 import org.citra.citra_emu.utils.NetPlayManager
+import org.citra.citra_emu.utils.ZeroTierManager
 
 class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
+
+    enum class MultiplayerMode { LAN, PUBLIC, ZEROTIER }
     private lateinit var adapter: NetPlayAdapter
     private val gameNameList: MutableList<Array<String>> = mutableListOf()
     private val gameIdList: MutableList<Array<Long>> = mutableListOf()
@@ -97,6 +100,30 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                         LobbyBrowser(context).show()
                         dismiss()
                     }
+
+                    // Mode 3: ZeroTier
+                    btnZeroTier.setOnClickListener {
+                        dismiss()
+                        if (!ZeroTierManager.isReady()) {
+                            ZeroTierDialog(context).show()
+                        } else {
+                            val ztIp = ZeroTierManager.getAssignedIP()
+                            android.app.AlertDialog.Builder(context)
+                                .setTitle("ZeroTier \u2713 IP: $ztIp")
+                                .setPositiveButton("Buat Room") { _, _ ->
+                                    showNetPlayInputDialog(true, MultiplayerMode.ZEROTIER)
+                                }
+                                .setNeutralButton("Gabung Room") { _, _ ->
+                                    showNetPlayInputDialog(false, MultiplayerMode.ZEROTIER)
+                                }
+                                .setNegativeButton("Pengaturan ZT") { _, _ ->
+                                    ZeroTierDialog(context).show()
+                                }
+                                .show()
+                        }
+                    }
+                    if (ZeroTierManager.isReady())
+                        btnZeroTier.text = "ZeroTier \u2713"
                 }
             }
         }
@@ -237,7 +264,10 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         }
     }
 
-    private fun showNetPlayInputDialog(isCreateRoom: Boolean) {
+    private fun showNetPlayInputDialog(
+        isCreateRoom: Boolean,
+        mode: MultiplayerMode = MultiplayerMode.LAN
+    ) {
         val activity = CompatUtils.findActivity(context)
         val dialog = BottomSheetDialog(activity)
 
@@ -253,10 +283,12 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
             else R.string.multiplayer_join_room
         )
 
-        binding.ipAddress.setText(
-            if (isCreateRoom) NetPlayManager.getIpAddressByWifi(activity)
-            else NetPlayManager.getRoomAddress(activity)
-        )
+        val prefilledIp = when {
+            isCreateRoom && mode == MultiplayerMode.ZEROTIER -> ZeroTierManager.getAssignedIP()
+            isCreateRoom -> NetPlayManager.getIpAddressByWifi(activity)
+            else         -> NetPlayManager.getRoomAddress(activity)
+        }
+        binding.ipAddress.setText(prefilledIp)
         binding.ipPort.setText(NetPlayManager.getRoomPort(activity))
         binding.username.setText(NetPlayManager.getUsername(activity))
 
