@@ -1,10 +1,5 @@
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
-//
-// ZeroTierNative.h — wrapper libzt via AAR Java API
-// Tidak memerlukan ZeroTierSockets.h (tidak ada header C dari AAR)
-// Semua operasi ZeroTier dipanggil via JNI ke Java class di AAR
-
 #pragma once
 #include <cstdint>
 #include <string>
@@ -20,10 +15,6 @@ enum class ZTResult {
     Timeout,
 };
 
-/**
- * Inisialisasi ZeroTier via AAR Java API.
- * Memanggil com.zerotier.libzt.ZeroTier melalui JNI.
- */
 ZTResult    Init(const std::string& storage_path, uint64_t network_id);
 void        Shutdown();
 bool        IsReady();
