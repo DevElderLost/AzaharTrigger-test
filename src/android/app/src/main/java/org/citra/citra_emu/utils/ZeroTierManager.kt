@@ -35,26 +35,52 @@ object ZeroTierManager {
         if (state == State.READY) { onReady(getAssignedIP()); return }
         if (state == State.STARTING) { onError("Sedang dalam proses inisialisasi"); return }
         state = State.STARTING
-        val storagePath = File(context.filesDir, "zt/$networkId").apply { mkdirs() }.absolutePath
+
+        val storagePath = try {
+            File(context.filesDir, "zt/$networkId").apply { mkdirs() }.absolutePath
+        } catch (e: Exception) {
+            state = State.ERROR
+            onError("Gagal membuat folder storage: ${e.message}")
+            return
+        }
+
         Thread {
-            Log.i(TAG, "Init ZeroTier network=$networkId")
-            val code = NetPlayManager.ztInit(storagePath, networkId)
-            if (code == 0) {
-                val ip = NetPlayManager.ztGetAssignedIP()
-                state = State.READY
-                Log.i(TAG, "ZeroTier ready IP=$ip")
-                onReady(ip)
-            } else {
-                state = State.ERROR
-                val msg = when (code) {
-                    1    -> "Sudah berjalan"
-                    2    -> "Gagal inisialisasi node"
-                    3    -> "Gagal join — periksa Network ID"
-                    4    -> "Node belum diauthorize di my.zerotier.com"
-                    5    -> "Timeout menunggu node online"
-                    else -> "Error tidak diketahui (code $code)"
+            try {
+                Log.i(TAG, "Init ZeroTier network=$networkId path=$storagePath")
+                val code = NetPlayManager.ztInit(storagePath, networkId)
+                if (code == 0) {
+                    val ip = NetPlayManager.ztGetAssignedIP()
+                    if (ip.isNullOrEmpty()) {
+                        state = State.ERROR
+                        onError("IP tidak diterima dari ZeroTier")
+                    } else {
+                        state = State.READY
+                        Log.i(TAG, "ZeroTier ready IP=$ip")
+                        onReady(ip)
+                    }
+                } else {
+                    state = State.ERROR
+                    val msg = when (code) {
+                        1    -> "Sudah berjalan"
+                        2    -> "Gagal inisialisasi — class ZeroTier tidak ditemukan di AAR"
+                        3    -> "Gagal join — periksa Network ID"
+                        4    -> "Node belum diauthorize di my.zerotier.com"
+                        5    -> "Timeout menunggu node online"
+                        else -> "Error tidak diketahui (code $code)"
+                    }
+                    Log.e(TAG, "ZeroTier error: $msg")
+                    onError(msg)
                 }
-                Log.e(TAG, "ZeroTier error: $msg")
+            } catch (e: UnsatisfiedLinkError) {
+                // Native library tidak ter-load
+                state = State.ERROR
+                val msg = "Native library ZeroTier tidak ditemukan. Pastikan libzt-release.aar sudah ditambahkan."
+                Log.e(TAG, msg, e)
+                onError(msg)
+            } catch (e: Exception) {
+                state = State.ERROR
+                val msg = "Crash: ${e.javaClass.simpleName}: ${e.message}"
+                Log.e(TAG, msg, e)
                 onError(msg)
             }
         }.start()
@@ -62,11 +88,15 @@ object ZeroTierManager {
 
     fun shutdown() {
         if (state == State.IDLE) return
-        NetPlayManager.ztShutdown()
+        try {
+            NetPlayManager.ztShutdown()
+        } catch (e: Exception) {
+            Log.e(TAG, "Shutdown error: ${e.message}", e)
+        }
         state = State.IDLE
         Log.i(TAG, "ZeroTier shutdown")
     }
 
     fun isReady()       = state == State.READY
-    fun getAssignedIP() = if (isReady()) NetPlayManager.ztGetAssignedIP() else ""
+    fun getAssignedIP() = if (isReady()) NetPlayManager.ztGetAssignedIP() ?: "" else ""
 }

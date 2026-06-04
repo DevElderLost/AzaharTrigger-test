@@ -1,3 +1,40 @@
+#!/bin/bash
+# fix_zerotier_crash.sh — Fix crash saat tombol Hubungkan ditekan
+# Root cause: NetPlayManager.ztInit() dipanggil dari background Thread
+# tapi JNI native code (ZeroTierNative.cpp) mencoba memanggil
+# IDCache::GetEnvForThread() yang butuh thread sudah ter-attach ke JVM.
+# Thread yang dibuat manual via Thread{} di Kotlin TIDAK otomatis
+# ter-attach ke JVM Android.
+#
+# Cara pakai:
+#   bash scripts/fix_zerotier_crash.sh
+
+set -e
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC}   $1"; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+
+JNI_DIR="$PROJECT_ROOT/src/android/app/src/main/jni"
+UTILS_DIR="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu/utils"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix ZeroTier Crash — Thread JVM Attach + Null Safety"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# ════════════════════════════════════════════════════════════════════
+# FIX 1: ZeroTierNative.cpp — ganti IDCache::GetEnvForThread()
+# dengan pendekatan yang attach thread ke JVM secara eksplisit
+# ════════════════════════════════════════════════════════════════════
+info "Fix 1/2: Tulis ulang ZeroTierNative.cpp — fix JVM thread attach..."
+
+cat > "$JNI_DIR/ZeroTierNative.cpp" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 //
@@ -231,3 +268,131 @@ uint64_t ParseNetworkId(const std::string& s) {
 }
 
 } // namespace ZeroTierNative
+EOF
+success "ZeroTierNative.cpp ditulis ulang dengan ScopedJNIEnv"
+
+# ════════════════════════════════════════════════════════════════════
+# FIX 2: ZeroTierManager.kt — tambah try-catch dan null safety
+# untuk mencegah crash tak tertangani di background thread
+# ════════════════════════════════════════════════════════════════════
+info "Fix 2/2: Tambah try-catch di ZeroTierManager.kt..."
+
+ZT_MGR="$UTILS_DIR/ZeroTierManager.kt"
+[ -f "$ZT_MGR" ] || error "ZeroTierManager.kt tidak ditemukan"
+
+cat > "$ZT_MGR" << 'EOF'
+// Copyright 2025 AzaharTrigger Project
+// Licensed under GPLv2 or any later version
+package org.citra.citra_emu.utils
+
+import android.content.Context
+import android.util.Log
+import java.io.File
+
+object ZeroTierManager {
+    private const val TAG       = "ZeroTierManager"
+    private const val PREFS_KEY = "zerotier_prefs"
+    private const val KEY_NET   = "zt_network_id"
+
+    enum class State { IDLE, STARTING, READY, ERROR }
+
+    @Volatile var state: State = State.IDLE
+        private set
+
+    fun saveNetworkId(context: Context, id: String) =
+        context.getSharedPreferences(PREFS_KEY, Context.MODE_PRIVATE)
+            .edit().putString(KEY_NET, id).apply()
+
+    fun getNetworkId(context: Context): String =
+        context.getSharedPreferences(PREFS_KEY, Context.MODE_PRIVATE)
+            .getString(KEY_NET, "") ?: ""
+
+    fun hasNetworkId(context: Context) = getNetworkId(context).length == 16
+
+    fun init(
+        context: Context,
+        networkId: String,
+        onReady: (ip: String) -> Unit,
+        onError: (msg: String) -> Unit
+    ) {
+        if (state == State.READY) { onReady(getAssignedIP()); return }
+        if (state == State.STARTING) { onError("Sedang dalam proses inisialisasi"); return }
+        state = State.STARTING
+
+        val storagePath = try {
+            File(context.filesDir, "zt/$networkId").apply { mkdirs() }.absolutePath
+        } catch (e: Exception) {
+            state = State.ERROR
+            onError("Gagal membuat folder storage: ${e.message}")
+            return
+        }
+
+        Thread {
+            try {
+                Log.i(TAG, "Init ZeroTier network=$networkId path=$storagePath")
+                val code = NetPlayManager.ztInit(storagePath, networkId)
+                if (code == 0) {
+                    val ip = NetPlayManager.ztGetAssignedIP()
+                    if (ip.isNullOrEmpty()) {
+                        state = State.ERROR
+                        onError("IP tidak diterima dari ZeroTier")
+                    } else {
+                        state = State.READY
+                        Log.i(TAG, "ZeroTier ready IP=$ip")
+                        onReady(ip)
+                    }
+                } else {
+                    state = State.ERROR
+                    val msg = when (code) {
+                        1    -> "Sudah berjalan"
+                        2    -> "Gagal inisialisasi — class ZeroTier tidak ditemukan di AAR"
+                        3    -> "Gagal join — periksa Network ID"
+                        4    -> "Node belum diauthorize di my.zerotier.com"
+                        5    -> "Timeout menunggu node online"
+                        else -> "Error tidak diketahui (code $code)"
+                    }
+                    Log.e(TAG, "ZeroTier error: $msg")
+                    onError(msg)
+                }
+            } catch (e: UnsatisfiedLinkError) {
+                // Native library tidak ter-load
+                state = State.ERROR
+                val msg = "Native library ZeroTier tidak ditemukan. Pastikan libzt-release.aar sudah ditambahkan."
+                Log.e(TAG, msg, e)
+                onError(msg)
+            } catch (e: Exception) {
+                state = State.ERROR
+                val msg = "Crash: ${e.javaClass.simpleName}: ${e.message}"
+                Log.e(TAG, msg, e)
+                onError(msg)
+            }
+        }.start()
+    }
+
+    fun shutdown() {
+        if (state == State.IDLE) return
+        try {
+            NetPlayManager.ztShutdown()
+        } catch (e: Exception) {
+            Log.e(TAG, "Shutdown error: ${e.message}", e)
+        }
+        state = State.IDLE
+        Log.i(TAG, "ZeroTier shutdown")
+    }
+
+    fun isReady()       = state == State.READY
+    fun getAssignedIP() = if (isReady()) NetPlayManager.ztGetAssignedIP() ?: "" else ""
+}
+EOF
+success "ZeroTierManager.kt ditulis ulang dengan try-catch"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo -e "${GREEN}  Fix selesai!${NC}"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+echo "Langkah selanjutnya:"
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTier crash — ScopedJNIEnv attach thread + try-catch\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
