@@ -1,3 +1,34 @@
+bash scripts/fix_zerotier_context.sh#!/bin/bash
+# fix_zerotier_context.sh — Fix NetPlayManager.setRoomAddress()
+# menerima Activity bukan Context.
+# Solusi: cast Context ke Activity di ZeroTierDialog
+#
+# Cara pakai:
+#   bash scripts/fix_zerotier_context.sh
+
+set -e
+
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+info()    { echo -e "${CYAN}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC}   $1"; }
+error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+
+ZT_DIALOG=$(find "$PROJECT_ROOT/src" -name "ZeroTierDialog.kt" | head -1)
+[ -n "$ZT_DIALOG" ] || error "ZeroTierDialog.kt tidak ditemukan"
+info "ZeroTierDialog.kt: $ZT_DIALOG"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix ZeroTierDialog: Context → Activity cast"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# Tulis ulang dengan CompatUtils.findActivity() untuk setRoomAddress
+# tapi tetap pakai Context untuk BottomSheetDialog constructor
+cat > "$ZT_DIALOG" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 package org.citra.citra_emu.dialogs
@@ -136,3 +167,16 @@ class ZeroTierDialog(context: Context) : BottomSheetDialog(context) {
         }
     }
 }
+EOF
+
+success "ZeroTierDialog.kt ditulis ulang dengan CompatUtils.findActivity()"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo -e "${GREEN}  Fix selesai!${NC}"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTierDialog gunakan CompatUtils.findActivity() untuk setRoomAddress\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
