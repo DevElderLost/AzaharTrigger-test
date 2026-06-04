@@ -29,7 +29,7 @@ static std::atomic<bool> zt_initialized{false};
 static std::atomic<bool> zt_ready{false};
 static char              zt_assigned_ip[64] = {0};
 static uint64_t          zt_network_id      = 0;
-static JavaVM*           g_jvm              = nullptr;
+JavaVM*           g_jvm              = nullptr;  // extern di jni_zt_bridge.cpp
 
 // Instance ZeroTierNode (object, bukan static class)
 static jobject g_node_instance = nullptr;
