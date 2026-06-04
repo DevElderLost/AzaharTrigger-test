@@ -25,9 +25,6 @@ val abiFilter = listOf("arm64-v8a", "x86_64")
 val downloadedJniLibsPath = "${layout.buildDirectory.get().asFile.path}/downloadedJniLibs"
 
 android {
-    repositories {
-        flatDir { dirs("libs") }
-    }
 
     namespace = "org.citra.citra_emu"
 
@@ -196,6 +193,8 @@ android {
 }
 
 dependencies {
+    implementation(files("libs/libzt-release.aar"))
+
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("androidx.appcompat:appcompat:1.7.0")
