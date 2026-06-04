@@ -1,3 +1,16 @@
+#!/bin/bash
+# fix_zt_dump_methods.sh — Tampilkan semua method ZeroTierNode di UI
+#
+# Cara pakai:
+#   bash scripts/fix_zt_dump_methods.sh
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+UTILS_DIR="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu/utils"
+
+cat > "$UTILS_DIR/ZeroTierManager.kt" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 package org.citra.citra_emu.utils
@@ -174,3 +187,11 @@ object ZeroTierManager {
     fun isReady()       = state == State.READY
     fun getAssignedIP() = assignedIp
 }
+EOF
+echo "[OK] ZeroTierManager.kt ditulis ulang dengan method dump"
+
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTierManager tampilkan semua method saat error\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
