@@ -35,7 +35,8 @@ class ZeroTierDialog(context: Context) : BottomSheetDialog(context) {
         binding.btnConnect.setOnClickListener {
             val networkId = binding.networkId.text.toString().trim()
             if (networkId.length != 16) {
-                binding.networkIdLayout.error = context.getString(R.string.zerotier_network_id_invalid)
+                binding.networkIdLayout.error =
+                    context.getString(R.string.zerotier_network_id_invalid)
                 return@setOnClickListener
             }
             binding.networkIdLayout.error = null
@@ -43,14 +44,18 @@ class ZeroTierDialog(context: Context) : BottomSheetDialog(context) {
             setLoading(true)
             binding.statusText.text = context.getString(R.string.zerotier_status_starting)
 
-            ZeroTierManager.init(context, networkId,
-                onReady = { ip ->
+            ZeroTierManager.init(
+                context   = context,
+                networkId = networkId,
+                onReady   = { ip ->
                     binding.root.post {
                         setLoading(false)
-                        binding.statusText.text = context.getString(R.string.zerotier_status_ready, ip)
-                        binding.assignedIp.text  = ip
+                        binding.statusText.text =
+                            context.getString(R.string.zerotier_status_ready, ip)
+                        binding.assignedIp.text         = ip
                         binding.ipContainer.visibility  = View.VISIBLE
-                        binding.btnConnect.text         = context.getString(R.string.zerotier_btn_reconnect)
+                        binding.btnConnect.text         =
+                            context.getString(R.string.zerotier_btn_reconnect)
                         binding.btnCreateRoom.isEnabled = true
                         binding.btnJoinRoom.isEnabled   = true
                         NetPlayManager.setRoomAddress(context, ip)
@@ -59,7 +64,8 @@ class ZeroTierDialog(context: Context) : BottomSheetDialog(context) {
                 onError = { msg ->
                     binding.root.post {
                         setLoading(false)
-                        binding.statusText.text = context.getString(R.string.zerotier_status_error, msg)
+                        binding.statusText.text =
+                            context.getString(R.string.zerotier_status_error, msg)
                         Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                     }
                 }
@@ -99,21 +105,24 @@ class ZeroTierDialog(context: Context) : BottomSheetDialog(context) {
     private fun updateStatusUI() {
         when (ZeroTierManager.state) {
             ZeroTierManager.State.IDLE -> {
-                binding.statusText.text         = context.getString(R.string.zerotier_status_idle)
+                binding.statusText.text         =
+                    context.getString(R.string.zerotier_status_idle)
                 binding.btnCreateRoom.isEnabled = false
                 binding.btnJoinRoom.isEnabled   = false
                 binding.ipContainer.visibility  = View.GONE
             }
             ZeroTierManager.State.READY -> {
                 val ip = ZeroTierManager.getAssignedIP()
-                binding.statusText.text         = context.getString(R.string.zerotier_status_ready, ip)
+                binding.statusText.text         =
+                    context.getString(R.string.zerotier_status_ready, ip)
                 binding.assignedIp.text         = ip
                 binding.ipContainer.visibility  = View.VISIBLE
                 binding.btnCreateRoom.isEnabled = true
                 binding.btnJoinRoom.isEnabled   = true
             }
             ZeroTierManager.State.ERROR -> {
-                binding.statusText.text         = context.getString(R.string.zerotier_status_error_generic)
+                binding.statusText.text         =
+                    context.getString(R.string.zerotier_status_error_generic)
                 binding.btnCreateRoom.isEnabled = false
                 binding.btnJoinRoom.isEnabled   = false
             }

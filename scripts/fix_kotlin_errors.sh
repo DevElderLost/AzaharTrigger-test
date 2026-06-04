@@ -1,9 +1,6 @@
 #!/bin/bash
-# fix_kotlin_errors.sh — Fix 2 error Kotlin ZeroTier
-#
-# Error 1: ZeroTierDialog pakai android.app.Activity bukan Context
-# Error 2: ZeroTierManager referensi ztInit/ztShutdown/ztGetAssignedIP
-#          tidak ditemukan karena belum ada di NetPlayManager.kt
+# fix_kotlin_errors.sh — Tulis ulang ZeroTierManager.kt, ZeroTierDialog.kt
+# dan tambah zt* JNI ke NetPlayManager.kt
 #
 # Cara pakai:
 #   bash scripts/fix_kotlin_errors.sh
@@ -21,196 +18,289 @@ KOTLIN_BASE="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu"
 DIALOGS_DIR="$KOTLIN_BASE/dialogs"
 UTILS_DIR="$KOTLIN_BASE/utils"
 
+[ -d "$DIALOGS_DIR" ] || error "Folder dialogs tidak ditemukan: $DIALOGS_DIR"
+[ -d "$UTILS_DIR"   ] || error "Folder utils tidak ditemukan: $UTILS_DIR"
+
 echo ""
 echo "═══════════════════════════════════════════════════════"
-echo "  Fix Kotlin ZeroTier Errors — AzaharTrigger"
+echo "  Fix Kotlin ZeroTier — Tulis Ulang File"
 echo "═══════════════════════════════════════════════════════"
 echo ""
 
 # ════════════════════════════════════════════════════════════════════
-# FIX 1: ZeroTierDialog.kt — ganti Activity dengan Context
-# BottomSheetDialog menerima Context, bukan Activity
+# FIX 1: Tulis ulang ZeroTierManager.kt
+# Menggunakan NetPlayManager.ztXxx() yang benar
 # ════════════════════════════════════════════════════════════════════
-info "Fix 1/2: ZeroTierDialog.kt — ganti Activity dengan Context..."
+info "Fix 1/3: Tulis ulang ZeroTierManager.kt..."
 
-ZT_DIALOG="$DIALOGS_DIR/ZeroTierDialog.kt"
-[ -f "$ZT_DIALOG" ] || error "ZeroTierDialog.kt tidak ditemukan: $ZT_DIALOG"
+cat > "$UTILS_DIR/ZeroTierManager.kt" << 'EOF'
+// Copyright 2025 AzaharTrigger Project
+// Licensed under GPLv2 or any later version
+package org.citra.citra_emu.utils
 
-PATCH_PY=$(mktemp /tmp/fix_kt_XXXXXX.py)
-cat > "$PATCH_PY" << 'PYEOF'
-import sys
-path = sys.argv[1]
-with open(path, 'r') as f:
-    content = f.read()
+import android.content.Context
+import android.util.Log
+import java.io.File
 
-# Hapus import Activity yang salah
-content = content.replace(
-    'import android.app.Activity\n', ''
-)
+object ZeroTierManager {
+    private const val TAG       = "ZeroTierManager"
+    private const val PREFS_KEY = "zerotier_prefs"
+    private const val KEY_NET   = "zt_network_id"
 
-# Ganti CompatUtils.findActivity(context) → context
-# karena BottomSheetDialog sudah menerima Context langsung
-content = content.replace(
-    'val activity = CompatUtils.findActivity(context)\n        val dialog = BottomSheetDialog(activity)',
-    'val dialog = BottomSheetDialog(context)'
-)
-content = content.replace(
-    'val activity = CompatUtils.findActivity(context)\n',
-    ''
-)
+    enum class State { IDLE, STARTING, READY, ERROR }
 
-# Ganti semua sisa referensi activity. → context.
-# hanya di dalam ZeroTierDialog (bukan untuk hal lain)
-import re
+    @Volatile var state: State = State.IDLE
+        private set
 
-# Ganti activity.getString → context.getString
-content = content.replace('activity.getString(', 'context.getString(')
-# Ganti activity.resources → context.resources
-content = content.replace('activity.resources', 'context.resources')
+    fun saveNetworkId(context: Context, id: String) =
+        context.getSharedPreferences(PREFS_KEY, Context.MODE_PRIVATE)
+            .edit().putString(KEY_NET, id).apply()
 
-# Pastikan BottomSheetDialog menerima context bukan activity
-content = re.sub(
-    r'BottomSheetDialog\(activity\)',
-    'BottomSheetDialog(context)',
-    content
-)
+    fun getNetworkId(context: Context): String =
+        context.getSharedPreferences(PREFS_KEY, Context.MODE_PRIVATE)
+            .getString(KEY_NET, "") ?: ""
 
-# Hapus import CompatUtils jika tidak dipakai lagi
-if 'CompatUtils' not in content or content.count('CompatUtils') == 1:
-    content = content.replace(
-        'import org.citra.citra_emu.utils.CompatUtils\n', ''
-    )
+    fun hasNetworkId(context: Context) = getNetworkId(context).length == 16
 
-with open(path, 'w') as f:
-    f.write(content)
-print("  ZeroTierDialog.kt: Activity → Context")
-PYEOF
+    fun init(
+        context: Context,
+        networkId: String,
+        onReady: (ip: String) -> Unit,
+        onError: (msg: String) -> Unit
+    ) {
+        if (state == State.READY) { onReady(getAssignedIP()); return }
+        if (state == State.STARTING) { onError("Sedang dalam proses inisialisasi"); return }
+        state = State.STARTING
+        val storagePath = File(context.filesDir, "zt/$networkId").apply { mkdirs() }.absolutePath
+        Thread {
+            Log.i(TAG, "Init ZeroTier network=$networkId")
+            val code = NetPlayManager.ztInit(storagePath, networkId)
+            if (code == 0) {
+                val ip = NetPlayManager.ztGetAssignedIP()
+                state = State.READY
+                Log.i(TAG, "ZeroTier ready IP=$ip")
+                onReady(ip)
+            } else {
+                state = State.ERROR
+                val msg = when (code) {
+                    1    -> "Sudah berjalan"
+                    2    -> "Gagal inisialisasi node"
+                    3    -> "Gagal join — periksa Network ID"
+                    4    -> "Node belum diauthorize di my.zerotier.com"
+                    5    -> "Timeout menunggu node online"
+                    else -> "Error tidak diketahui (code $code)"
+                }
+                Log.e(TAG, "ZeroTier error: $msg")
+                onError(msg)
+            }
+        }.start()
+    }
 
-python3 "$PATCH_PY" "$ZT_DIALOG"
-rm -f "$PATCH_PY"
-success "ZeroTierDialog.kt dipatch"
+    fun shutdown() {
+        if (state == State.IDLE) return
+        NetPlayManager.ztShutdown()
+        state = State.IDLE
+        Log.i(TAG, "ZeroTier shutdown")
+    }
+
+    fun isReady()       = state == State.READY
+    fun getAssignedIP() = if (isReady()) NetPlayManager.ztGetAssignedIP() else ""
+}
+EOF
+success "ZeroTierManager.kt ditulis ulang"
 
 # ════════════════════════════════════════════════════════════════════
-# FIX 2: NetPlayManager.kt — tambah deklarasi ztInit/ztShutdown/ztGetAssignedIP
-# Ini yang menyebabkan "Unresolved reference" di ZeroTierManager.kt
+# FIX 2: Tulis ulang ZeroTierDialog.kt
+# Pakai Context langsung — TIDAK pakai CompatUtils.findActivity()
+# karena BottomSheetDialog butuh Context, bukan Activity
 # ════════════════════════════════════════════════════════════════════
-info "Fix 2/2: NetPlayManager.kt — tambah JNI declarations zt*..."
+info "Fix 2/3: Tulis ulang ZeroTierDialog.kt..."
+
+cat > "$DIALOGS_DIR/ZeroTierDialog.kt" << 'EOF'
+// Copyright 2025 AzaharTrigger Project
+// Licensed under GPLv2 or any later version
+package org.citra.citra_emu.dialogs
+
+import android.content.Context
+import android.content.res.Configuration
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.Toast
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import org.citra.citra_emu.R
+import org.citra.citra_emu.databinding.DialogZerotierNativeBinding
+import org.citra.citra_emu.utils.NetPlayManager
+import org.citra.citra_emu.utils.ZeroTierManager
+
+class ZeroTierDialog(context: Context) : BottomSheetDialog(context) {
+    private lateinit var binding: DialogZerotierNativeBinding
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        behavior.skipCollapsed =
+            context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        binding = DialogZerotierNativeBinding.inflate(LayoutInflater.from(context))
+        setContentView(binding.root)
+
+        ZeroTierManager.getNetworkId(context).let {
+            if (it.isNotEmpty()) binding.networkId.setText(it)
+        }
+        updateStatusUI()
+
+        binding.btnConnect.setOnClickListener {
+            val networkId = binding.networkId.text.toString().trim()
+            if (networkId.length != 16) {
+                binding.networkIdLayout.error =
+                    context.getString(R.string.zerotier_network_id_invalid)
+                return@setOnClickListener
+            }
+            binding.networkIdLayout.error = null
+            ZeroTierManager.saveNetworkId(context, networkId)
+            setLoading(true)
+            binding.statusText.text = context.getString(R.string.zerotier_status_starting)
+
+            ZeroTierManager.init(
+                context   = context,
+                networkId = networkId,
+                onReady   = { ip ->
+                    binding.root.post {
+                        setLoading(false)
+                        binding.statusText.text =
+                            context.getString(R.string.zerotier_status_ready, ip)
+                        binding.assignedIp.text         = ip
+                        binding.ipContainer.visibility  = View.VISIBLE
+                        binding.btnConnect.text         =
+                            context.getString(R.string.zerotier_btn_reconnect)
+                        binding.btnCreateRoom.isEnabled = true
+                        binding.btnJoinRoom.isEnabled   = true
+                        NetPlayManager.setRoomAddress(context, ip)
+                    }
+                },
+                onError = { msg ->
+                    binding.root.post {
+                        setLoading(false)
+                        binding.statusText.text =
+                            context.getString(R.string.zerotier_status_error, msg)
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+        }
+
+        binding.btnDisconnect.setOnClickListener {
+            ZeroTierManager.shutdown()
+            updateStatusUI()
+            binding.ipContainer.visibility  = View.GONE
+            binding.btnCreateRoom.isEnabled = false
+            binding.btnJoinRoom.isEnabled   = false
+            Toast.makeText(context, R.string.zerotier_disconnected, Toast.LENGTH_SHORT).show()
+        }
+
+        binding.btnCreateRoom.setOnClickListener {
+            if (!ZeroTierManager.isReady()) return@setOnClickListener
+            NetPlayManager.setRoomAddress(context, ZeroTierManager.getAssignedIP())
+            dismiss()
+            NetPlayDialog(context).show()
+        }
+
+        binding.btnJoinRoom.setOnClickListener {
+            if (!ZeroTierManager.isReady()) return@setOnClickListener
+            dismiss()
+            NetPlayDialog(context).show()
+        }
+    }
+
+    private fun setLoading(loading: Boolean) {
+        binding.progressBar.visibility  = if (loading) View.VISIBLE else View.GONE
+        binding.btnConnect.isEnabled    = !loading
+        binding.btnDisconnect.isEnabled = !loading
+        binding.networkId.isEnabled     = !loading
+    }
+
+    private fun updateStatusUI() {
+        when (ZeroTierManager.state) {
+            ZeroTierManager.State.IDLE -> {
+                binding.statusText.text         =
+                    context.getString(R.string.zerotier_status_idle)
+                binding.btnCreateRoom.isEnabled = false
+                binding.btnJoinRoom.isEnabled   = false
+                binding.ipContainer.visibility  = View.GONE
+            }
+            ZeroTierManager.State.READY -> {
+                val ip = ZeroTierManager.getAssignedIP()
+                binding.statusText.text         =
+                    context.getString(R.string.zerotier_status_ready, ip)
+                binding.assignedIp.text         = ip
+                binding.ipContainer.visibility  = View.VISIBLE
+                binding.btnCreateRoom.isEnabled = true
+                binding.btnJoinRoom.isEnabled   = true
+            }
+            ZeroTierManager.State.ERROR -> {
+                binding.statusText.text         =
+                    context.getString(R.string.zerotier_status_error_generic)
+                binding.btnCreateRoom.isEnabled = false
+                binding.btnJoinRoom.isEnabled   = false
+            }
+            else -> {}
+        }
+    }
+}
+EOF
+success "ZeroTierDialog.kt ditulis ulang"
+
+# ════════════════════════════════════════════════════════════════════
+# FIX 3: NetPlayManager.kt — tambah zt* JNI declarations
+# ════════════════════════════════════════════════════════════════════
+info "Fix 3/3: Tambah zt* JNI ke NetPlayManager.kt..."
 
 NETPLAY_MGR=$(find "$PROJECT_ROOT/src" -name "NetPlayManager.kt" | head -1)
 [ -n "$NETPLAY_MGR" ] || error "NetPlayManager.kt tidak ditemukan"
 info "NetPlayManager.kt: $NETPLAY_MGR"
 
-if ! grep -q "ztInit" "$NETPLAY_MGR"; then
-    PATCH_PY2=$(mktemp /tmp/fix_netplay_XXXXXX.py)
-    cat > "$PATCH_PY2" << 'PYEOF'
+if grep -q "ztInit" "$NETPLAY_MGR"; then
+    success "ztInit sudah ada di NetPlayManager.kt, skip"
+else
+    PATCH_PY=$(mktemp /tmp/fix_netplay_XXXXXX.py)
+    cat > "$PATCH_PY" << 'PYEOF'
 import sys, re
 path = sys.argv[1]
 with open(path, 'r') as f:
     content = f.read()
 
-zt_jni = """
-        // ── ZeroTier JNI bridge ──────────────────────────────────────
-        // Dipanggil oleh ZeroTierManager untuk kontrol tunnel libzt AAR
+zt_jni = """\n
+        // ── ZeroTier JNI ─────────────────────────────────────────────
         @JvmStatic external fun ztInit(storagePath: String, networkIdHex: String): Int
         @JvmStatic external fun ztShutdown()
         @JvmStatic external fun ztGetAssignedIP(): String
-        @JvmStatic external fun ztIsReady(): Boolean
-"""
+        @JvmStatic external fun ztIsReady(): Boolean"""
 
-# Sisipkan setelah external fun terakhir yang sudah ada
+# Sisipkan setelah @JvmStatic external fun terakhir yang ada
 matches = list(re.finditer(r'@JvmStatic external fun \w+[^\n]*\n', content))
 if matches:
-    last = matches[-1]
-    pos  = last.end()
-    content = content[:pos] + zt_jni + content[pos:]
+    pos = matches[-1].end()
+    content = content[:pos] + zt_jni + "\n" + content[pos:]
     with open(path, 'w') as f:
         f.write(content)
-    print("  4 fungsi zt* ditambahkan ke NetPlayManager.kt")
+    print("  4 fungsi zt* berhasil ditambahkan")
 else:
-    # Fallback: sisipkan sebelum closing brace companion object
-    # Cari pola "companion object" dan closing brace-nya
-    co_match = re.search(r'companion object\s*\{', content)
-    if co_match:
-        # Cari closing brace companion object
-        start = co_match.end()
-        depth = 1
-        pos   = start
-        while pos < len(content) and depth > 0:
-            if content[pos] == '{': depth += 1
-            elif content[pos] == '}': depth -= 1
-            pos += 1
-        # Sisipkan sebelum closing brace companion object
-        insert_pos = pos - 1
-        content = content[:insert_pos] + zt_jni + content[insert_pos:]
+    # Fallback: sisipkan sebelum closing brace terakhir
+    last_brace = content.rfind('\n}')
+    if last_brace != -1:
+        content = content[:last_brace] + zt_jni + "\n" + content[last_brace:]
         with open(path, 'w') as f:
             f.write(content)
-        print("  4 fungsi zt* ditambahkan ke companion object NetPlayManager.kt")
+        print("  4 fungsi zt* ditambahkan (fallback)")
     else:
-        print("  WARN: Tidak bisa menemukan titik insert di NetPlayManager.kt")
+        print("  ERROR: Tidak bisa menemukan titik insert")
+        sys.exit(1)
 PYEOF
-
-    python3 "$PATCH_PY2" "$NETPLAY_MGR"
-    rm -f "$PATCH_PY2"
+    python3 "$PATCH_PY" "$NETPLAY_MGR"
+    rm -f "$PATCH_PY"
     success "NetPlayManager.kt: tambah ztInit/ztShutdown/ztGetAssignedIP/ztIsReady"
-else
-    info "NetPlayManager.kt: ztInit sudah ada, cek apakah ada typo..."
-
-    # Verifikasi semua 4 fungsi ada
-    PATCH_PY3=$(mktemp /tmp/verify_kt_XXXXXX.py)
-    cat > "$PATCH_PY3" << 'PYEOF'
-import sys
-path = sys.argv[1]
-with open(path, 'r') as f:
-    content = f.read()
-
-missing = []
-for fn in ['ztInit', 'ztShutdown', 'ztGetAssignedIP', 'ztIsReady']:
-    if fn not in content:
-        missing.append(fn)
-
-if missing:
-    print(f"  WARN: Fungsi berikut tidak ditemukan: {missing}")
-else:
-    print("  Semua 4 fungsi zt* sudah ada")
-PYEOF
-    python3 "$PATCH_PY3" "$NETPLAY_MGR"
-    rm -f "$PATCH_PY3"
-fi
-
-# ════════════════════════════════════════════════════════════════════
-# BONUS: Verifikasi ZeroTierManager.kt memanggil fungsi yang benar
-# ════════════════════════════════════════════════════════════════════
-info "Verifikasi ZeroTierManager.kt..."
-ZT_MGR="$UTILS_DIR/ZeroTierManager.kt"
-if [ -f "$ZT_MGR" ]; then
-    PATCH_PY4=$(mktemp /tmp/verify_ztmgr_XXXXXX.py)
-    cat > "$PATCH_PY4" << 'PYEOF'
-import sys
-path = sys.argv[1]
-with open(path, 'r') as f:
-    content = f.read()
-
-# Pastikan pemanggilan menggunakan NetPlayManager.ztXxx() bukan ztXxx() langsung
-fixes = 0
-for old, new in [
-    ('ztInit(', 'NetPlayManager.ztInit('),
-    ('ztShutdown()', 'NetPlayManager.ztShutdown()'),
-    ('ztGetAssignedIP()', 'NetPlayManager.ztGetAssignedIP()'),
-    ('ztIsReady()', 'NetPlayManager.ztIsReady()'),
-]:
-    if old in content and new not in content:
-        content = content.replace(old, new)
-        fixes += 1
-
-if fixes > 0:
-    with open(path, 'w') as f:
-        f.write(content)
-    print(f"  ZeroTierManager.kt: {fixes} referensi diperbaiki → NetPlayManager.ztXxx()")
-else:
-    print("  ZeroTierManager.kt: OK")
-PYEOF
-    python3 "$PATCH_PY4" "$ZT_MGR"
-    rm -f "$PATCH_PY4"
 fi
 
 echo ""
@@ -220,6 +310,6 @@ echo "════════════════════════�
 echo ""
 echo "Langkah selanjutnya:"
 echo "  git add ."
-echo "  git commit -m \"fix: ZeroTierDialog Context bukan Activity + tambah zt* JNI di NetPlayManager\""
+echo "  git commit -m \"fix: tulis ulang ZeroTierDialog+Manager, tambah zt* JNI\""
 echo "  git push origin DevElderLost-patch-4"
 echo ""

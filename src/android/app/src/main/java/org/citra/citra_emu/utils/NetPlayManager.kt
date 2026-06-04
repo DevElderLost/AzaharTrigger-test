@@ -310,4 +310,11 @@ object NetPlayManager {
         const val ADDRESS_UNBANNED = 26
         const val CHAT_MESSAGE = 27
     }
+
+        // ── ZeroTier JNI ─────────────────────────────────────────────
+        @JvmStatic external fun ztInit(storagePath: String, networkIdHex: String): Int
+        @JvmStatic external fun ztShutdown()
+        @JvmStatic external fun ztGetAssignedIP(): String
+        @JvmStatic external fun ztIsReady(): Boolean
+
 }
