@@ -1,3 +1,24 @@
+#!/bin/bash
+# fix_zt_native_direct.sh — Panggil ZeroTierNative static methods langsung
+# Bypass ZeroTierNode karena ProGuard obfuskasi method-nya
+# ZeroTierNative memiliki semua method sebagai static native
+#
+# Cara pakai:
+#   bash scripts/fix_zt_native_direct.sh
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+UTILS_DIR="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu/utils"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix: Panggil ZeroTierNative static methods langsung"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+cat > "$UTILS_DIR/ZeroTierManager.kt" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 //
@@ -193,3 +214,11 @@ object ZeroTierManager {
     fun isReady()       = state == State.READY
     fun getAssignedIP() = assignedIp
 }
+EOF
+echo "[OK] ZeroTierManager.kt ditulis ulang via ZeroTierNative static methods"
+
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTierManager via ZeroTierNative static methods bypass ProGuard\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
