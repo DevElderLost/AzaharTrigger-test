@@ -181,13 +181,27 @@ object ZeroTierManager {
 
     fun shutdown() {
         if (state == State.IDLE) return
-        try {
-            if (currentNetworkId != 0L)
-                callStatic("zts_net_leave", currentNetworkId)
-            callStatic("zts_node_stop")
-        } catch (e: Exception) { Log.e(TAG, "Shutdown: ${e.message}") }
-        assignedIp = ""; currentNetworkId = 0L
+        // Set IDLE dulu agar tidak ada thread lain yang masuk
         state = State.IDLE
+        Thread {
+            try {
+                if (ztNativeClass != null) {
+                    if (currentNetworkId != 0L) {
+                        try { callStatic("zts_net_leave", currentNetworkId) }
+                        catch (e: Exception) { Log.w(TAG, "leave: ${e.message}") }
+                    }
+                    try { callStatic("zts_node_stop") }
+                    catch (e: Exception) { Log.w(TAG, "stop: ${e.message}") }
+                }
+                Log.i(TAG, "ZeroTier stopped")
+            } catch (e: Exception) {
+                Log.e(TAG, "Shutdown error: ${e.message}")
+            } finally {
+                assignedIp        = ""
+                currentNetworkId  = 0L
+                ztNativeClass     = null
+            }
+        }.start()
     }
 
     fun isReady()       = state == State.READY

@@ -283,10 +283,19 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
             else R.string.multiplayer_join_room
         )
 
+        // Prioritaskan ZeroTier IP jika sudah terhubung
+        // (berlaku untuk semua mode termasuk LAN saat pakai data seluler)
         val prefilledIp = when {
-            isCreateRoom && mode == MultiplayerMode.ZEROTIER -> ZeroTierManager.getAssignedIP()
-            isCreateRoom -> NetPlayManager.getIpAddressByWifi(activity)
-            else         -> NetPlayManager.getRoomAddress(activity)
+            // Mode ZeroTier Create: pakai ZT IP
+            isCreateRoom && mode == MultiplayerMode.ZEROTIER ->
+                ZeroTierManager.getAssignedIP()
+            // Mode LAN Create: jika ZT ready, pakai ZT IP (data seluler + ZT)
+            // jika tidak, pakai WiFi IP seperti biasa
+            isCreateRoom ->
+                if (ZeroTierManager.isReady()) ZeroTierManager.getAssignedIP()
+                else NetPlayManager.getIpAddressByWifi(activity)
+            // Mode Join: pakai IP terakhir
+            else -> NetPlayManager.getRoomAddress(activity)
         }
         binding.ipAddress.setText(prefilledIp)
         binding.ipPort.setText(NetPlayManager.getRoomPort(activity))
