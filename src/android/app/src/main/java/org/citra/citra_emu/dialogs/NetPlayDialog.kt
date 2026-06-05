@@ -195,7 +195,6 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         // Tampilkan label mode di bawah field IP agar user tahu sedang di mode apa
         // Tampilkan label mode
         try {
-            val modeLabelText = when (mode) {
                 MultiplayerMode.LAN ->
                     if (ZeroTierManager.isReady())
                         "ZeroTier ✓ IP: ${ZeroTierManager.getAssignedIP()}"
@@ -204,10 +203,7 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                     "ZeroTier ✓ IP: ${ZeroTierManager.getAssignedIP()}"
                 MultiplayerMode.PUBLIC -> ""
             }
-            binding.modeLabel.visibility = View.VISIBLE
-            binding.modeLabel.text = modeLabelText
         } catch (e: Exception) {
-            // modeLabel mungkin tidak ada di layout lama
         }
 
         binding.ipPort.setText(NetPlayManager.getRoomPort(activity))
