@@ -1061,4 +1061,14 @@
     <string name="zerotier_btn_reconnect">Hubungkan Ulang</string>
     <string name="zerotier_btn_disconnect">Putuskan</string>
     <string name="zerotier_disconnected">ZeroTier diputus</string>
+    <string name="zerotier_btn_connected">ZeroTier ✓</string>
+    <string name="zerotier_create_room_title">Buat Room (ZeroTier)</string>
+    <string name="zerotier_join_room_title">Gabung Room (ZeroTier)</string>
+    <string name="multiplayer_mode_lan">Mode: LAN (WiFi/Hotspot)</string>
+    <string name="multiplayer_mode_zerotier">Mode: ZeroTier – IP: %s</string>
+    <string name="zerotier_mode_title">ZeroTier Terhubung</string>
+    <string name="zerotier_mode_message">IP ZeroTier kamu: %s
+
+Pilih mode:</string>
+    <string name="zerotier_btn_settings">Pengaturan ZT</string>
 </resources>

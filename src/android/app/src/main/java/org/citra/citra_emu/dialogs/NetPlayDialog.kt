@@ -125,7 +125,7 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                     // Tampilkan badge "Terhubung" jika ZeroTier sudah aktif
                     if (ZeroTierManager.isReady()) {
                         btnZeroTier.text =
-                            context.getString(R.string.zerotier_btn_connected)
+                            "ZeroTier ✓"
                     }
                 }
             }
@@ -193,18 +193,21 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         binding.ipAddress.setText(prefilledIp)
 
         // Tampilkan label mode di bawah field IP agar user tahu sedang di mode apa
-        binding.modeLabel.apply {
-            visibility = View.VISIBLE
-            text = when (mode) {
+        // Tampilkan label mode
+        try {
+            val modeLabelText = when (mode) {
                 MultiplayerMode.LAN ->
                     if (ZeroTierManager.isReady())
                         "ZeroTier ✓ IP: ${ZeroTierManager.getAssignedIP()}"
-                    else context.getString(R.string.multiplayer_mode_lan)
+                    else "Mode: LAN"
                 MultiplayerMode.ZEROTIER ->
-                    context.getString(R.string.multiplayer_mode_zerotier,
-                        ZeroTierManager.getAssignedIP())
+                    "ZeroTier ✓ IP: ${ZeroTierManager.getAssignedIP()}"
                 MultiplayerMode.PUBLIC -> ""
             }
+            binding.modeLabel.visibility = View.VISIBLE
+            binding.modeLabel.text = modeLabelText
+        } catch (e: Exception) {
+            // modeLabel mungkin tidak ada di layout lama
         }
 
         binding.ipPort.setText(NetPlayManager.getRoomPort(activity))
