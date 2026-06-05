@@ -23,3 +23,23 @@
 -dontwarn java.beans.Introspector
 -dontwarn java.beans.VetoableChangeListener
 -dontwarn java.beans.VetoableChangeSupport
+
+# ── ZeroTier libzt AAR — jangan obfuskasi/hapus ──────────────────
+# ZeroTierNative berisi native methods yang dipanggil via JNI
+# ZeroTierNode adalah wrapper yang dipanggil via Kotlin reflection
+-keep class com.zerotier.** { *; }
+-keepclassmembers class com.zerotier.** { *; }
+-keepnames class com.zerotier.** { *; }
+
+# Pastikan semua native methods dipertahankan
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# Pertahankan nama method yang dipanggil via reflection
+-keepclassmembers class com.zerotier.sockets.ZeroTierNative {
+    public static <methods>;
+}
+-keepclassmembers class com.zerotier.sockets.ZeroTierNode {
+    public <methods>;
+}
