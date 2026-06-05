@@ -1,3 +1,36 @@
+#!/bin/bash
+# fix_zt_from_source.sh — Tulis ZeroTierManager berdasarkan source yang tepat
+#
+# Cara pakai:
+#   bash scripts/fix_zt_from_source.sh
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+UTILS_DIR="$PROJECT_ROOT/src/android/app/src/main/java/org/citra/citra_emu/utils"
+
+echo ""
+echo "═══════════════════════════════════════════════════════"
+echo "  Fix ZeroTierManager — berdasarkan source ZeroTierNode"
+echo "═══════════════════════════════════════════════════════"
+echo ""
+
+# Berdasarkan ZeroTierNode.java yang kita lihat, method yang ada:
+# - initFromStorage(String) → ZeroTierNative.zts_init_from_storage(str)
+# - start()                 → ZeroTierNative.zts_node_start()
+# - stop()                  → ZeroTierNative.zts_node_stop()
+# - isOnline()              → ZeroTierNative.zts_node_is_online() == 1
+# - join(long)              → ZeroTierNative.zts_net_join(j)
+# - leave(long)             → ZeroTierNative.zts_net_leave(j)
+# - getIPv4Address(long)    → InetAddress dari zts_addr_get_str(j, ZTS_AF_INET)
+# - isNetworkTransportReady(long) → zts_net_transport_is_ready(j) == 1
+# - getId()                 → zts_node_get_id()
+#
+# ZeroTierNative static block: System.loadLibrary("zt") + zts_init()
+# Method tersedia kosong karena declaringClass filter → hapus filter itu
+
+cat > "$UTILS_DIR/ZeroTierManager.kt" << 'EOF'
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
 //
@@ -217,3 +250,11 @@ object ZeroTierManager {
     fun isReady()       = state == State.READY
     fun getAssignedIP() = assignedIp
 }
+EOF
+echo "[OK] ZeroTierManager.kt ditulis berdasarkan source yang benar"
+
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: ZeroTierManager berdasarkan source ZeroTierNode yang tepat\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
