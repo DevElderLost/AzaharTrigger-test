@@ -101,29 +101,15 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                         dismiss()
                     }
 
-                    // Mode 3: ZeroTier
+                    // Mode 3: ZeroTier — langsung buka ZeroTierDialog
+                    // Tombol Create/Join sudah ada di menu utama (btnCreate/btnJoin)
                     btnZeroTier.setOnClickListener {
                         dismiss()
-                        if (!ZeroTierManager.isReady()) {
-                            ZeroTierDialog(context).show()
-                        } else {
-                            val ztIp = ZeroTierManager.getAssignedIP()
-                            android.app.AlertDialog.Builder(context)
-                                .setTitle("ZeroTier \u2713 IP: $ztIp")
-                                .setPositiveButton("Buat Room") { _, _ ->
-                                    showNetPlayInputDialog(true, MultiplayerMode.ZEROTIER)
-                                }
-                                .setNeutralButton("Gabung Room") { _, _ ->
-                                    showNetPlayInputDialog(false, MultiplayerMode.ZEROTIER)
-                                }
-                                .setNegativeButton("Pengaturan ZT") { _, _ ->
-                                    ZeroTierDialog(context).show()
-                                }
-                                .show()
-                        }
+                        ZeroTierDialog(context).show()
                     }
-                    if (ZeroTierManager.isReady())
-                        btnZeroTier.text = "ZeroTier \u2713"
+                    // Update teks tombol sesuai status ZeroTier
+                    btnZeroTier.text = if (ZeroTierManager.isReady())
+                        "ZeroTier \u2713" else "ZeroTier"
                 }
             }
         }
@@ -360,7 +346,16 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 return@setOnClickListener
             }
 
-            if (ipAddress.length < 7 || username.length < 5) {
+            // Jika IP kosong/invalid dan ZeroTier ready, otomatis pakai ZT IP
+            val effectiveIp = if ((ipAddress.isEmpty() || ipAddress == "0.0.0.0" ||
+                ipAddress.length < 7) && ZeroTierManager.isReady()) {
+                ZeroTierManager.getAssignedIP()
+            } else {
+                ipAddress
+            }
+            binding.ipAddress.setText(effectiveIp)
+
+            if (effectiveIp.length < 7 || username.length < 5) {
                 Toast.makeText(activity, R.string.multiplayer_input_invalid, Toast.LENGTH_LONG).show()
                 binding.btnConfirm.isEnabled = true
                 binding.btnConfirm.text = activity.getString(R.string.original_button_text)
@@ -371,12 +366,12 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 Thread {
                     val result = if (isCreateRoom) {
                         NetPlayManager.netPlayCreateRoom(
-                            ipAddress, port, username,
+                            effectiveIp, port, username,
                             preferedGameName, preferedGameId,
                             password, roomName, maxPlayers
                         )
                     } else {
-                        NetPlayManager.netPlayJoinRoom(ipAddress, port, username, password)
+                        NetPlayManager.netPlayJoinRoom(effectiveIp, port, username, password)
                     }
 
                     // Kembali ke UI thread hanya untuk update tampilan
