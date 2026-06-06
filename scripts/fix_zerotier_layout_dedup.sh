@@ -1,3 +1,17 @@
+#!/bin/bash
+# fix_zerotier_layout_dedup.sh — Fix duplicate ID di dialog_zerotier_native.xml
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+LAYOUT="$PROJECT_ROOT/src/android/app/src/main/res/layout/dialog_zerotier_native.xml"
+
+[ -f "$LAYOUT" ] || { echo "[ERROR] Layout tidak ditemukan: $LAYOUT"; exit 1; }
+
+echo "[INFO] Tulis ulang dialog_zerotier_native.xml bersih..."
+
+cat > "$LAYOUT" << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -162,3 +176,11 @@
 
     </LinearLayout>
 </ScrollView>
+EOF
+
+echo "[OK] dialog_zerotier_native.xml ditulis ulang bersih (tanpa duplicate ID)"
+echo ""
+echo "  git add ."
+echo "  git commit -m \"fix: hapus duplicate ID btnCreateRoom/btnJoinRoom di layout ZeroTier\""
+echo "  git push origin DevElderLost-patch-4"
+echo ""
