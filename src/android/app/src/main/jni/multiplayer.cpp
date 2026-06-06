@@ -193,21 +193,28 @@ NetPlayStatus AndroidMultiplayer::NetPlayCreateRoom(const std::string& ipaddress
         return NetPlayStatus::CREATE_ROOM_ERROR;
     }
 
-    // Failsafe timer to avoid joining before creation
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Beri waktu room untuk fully initialize sebelum join
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     member->Join(username, Service::CFG::GetConsoleIdHash(system), ipaddress.c_str(), port, 0, Network::NoPreferredMac, password);
 
-    // Failsafe timer to avoid joining before creation
-    for (int i = 0; i < 5; i++) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Tunggu join selesai — ZeroTier butuh waktu lebih lama (via internet)
+    // Timeout 15 detik untuk accommodate ZeroTier latency
+    constexpr int CREATE_JOIN_TIMEOUT_MS = 15000;
+    constexpr int CREATE_JOIN_STEP_MS    = 200;
+    for (int elapsed = 0; elapsed < CREATE_JOIN_TIMEOUT_MS; elapsed += CREATE_JOIN_STEP_MS) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(CREATE_JOIN_STEP_MS));
         if (member->GetState() == Network::RoomMember::State::Joined ||
             member->GetState() == Network::RoomMember::State::Moderator) {
             return NetPlayStatus::NO_ERROR;
         }
+        // Jika state kembali ke Idle sebelum timeout, berarti join gagal
+        if (member->GetState() == Network::RoomMember::State::Idle) {
+            break;
+        }
     }
 
-    // If join failed while room is created, clean up the room
+    // Join gagal — bersihkan room
     room->Destroy();
     return NetPlayStatus::CREATE_ROOM_ERROR;
 }
@@ -228,14 +235,19 @@ NetPlayStatus AndroidMultiplayer::NetPlayJoinRoom(const std::string& ipaddress, 
     // Wait for the connection and join process to complete.
     // Use a longer timeout (5000ms = 5 seconds) to account for slower LAN networks.
     // This matches the ConnectionTimeoutMs used in RoomMember::Join()
-    constexpr int JOIN_WAIT_TIMEOUT_MS = 5000;
-    constexpr int JOIN_WAIT_STEP_MS = 100;
+    // ZeroTier membutuhkan waktu lebih lama untuk handshake via internet
+    constexpr int JOIN_WAIT_TIMEOUT_MS = 15000;
+    constexpr int JOIN_WAIT_STEP_MS    = 200;
     for (int elapsed = 0; elapsed < JOIN_WAIT_TIMEOUT_MS; elapsed += JOIN_WAIT_STEP_MS) {
         std::this_thread::sleep_for(std::chrono::milliseconds(JOIN_WAIT_STEP_MS));
-        
+
         if (member->GetState() == Network::RoomMember::State::Joined ||
             member->GetState() == Network::RoomMember::State::Moderator) {
             return NetPlayStatus::NO_ERROR;
+        }
+        // Early exit jika state kembali Idle (koneksi ditolak)
+        if (member->GetState() == Network::RoomMember::State::Idle) {
+            break;
         }
     }
 
