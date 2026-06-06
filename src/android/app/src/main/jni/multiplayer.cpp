@@ -196,7 +196,11 @@ NetPlayStatus AndroidMultiplayer::NetPlayCreateRoom(const std::string& ipaddress
     // Beri waktu room untuk fully initialize sebelum join
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    member->Join(username, Service::CFG::GetConsoleIdHash(system), ipaddress.c_str(), port, 0, Network::NoPreferredMac, password);
+    // Host join ke localhost karena room server ada di device yang sama.
+    // Menggunakan ZeroTier IP (ipaddress) akan gagal karena ENet tidak bisa
+    // connect ke virtual interface ZeroTier dari device itu sendiri.
+    // Client lain tetap join ke ZeroTier IP host dari device mereka.
+    member->Join(username, Service::CFG::GetConsoleIdHash(system), "127.0.0.1", port, 0, Network::NoPreferredMac, password);
 
     // Tunggu join selesai — ZeroTier butuh waktu lebih lama (via internet)
     // Timeout 15 detik untuk accommodate ZeroTier latency
