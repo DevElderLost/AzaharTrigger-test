@@ -591,7 +591,7 @@ RoomInformation RoomMember::GetRoomInformation() const {
 void RoomMember::Join(const std::string& nick, const std::string& console_id_hash,
                       const char* server_addr, u16 server_port, u16 client_port,
                       const MacAddress& preferred_mac, const std::string& password,
-                      const std::string& token) {
+                      const std::string& token, const std::string& local_ip) {
     // If the member is connected, kill the connection first
     if (room_member_impl->loop_thread && room_member_impl->loop_thread->joinable()) {
         Leave();
@@ -602,7 +602,17 @@ void RoomMember::Join(const std::string& nick, const std::string& console_id_has
     }
 
     if (!room_member_impl->client) {
-        room_member_impl->client = enet_host_create(nullptr, 1, NumChannels, 0, 0);
+        if (!local_ip.empty() && local_ip != "0.0.0.0") {
+            // Bind ke local_ip (ZeroTier IP) agar routing lewat ZeroTier interface
+            ENetAddress local_address{};
+            enet_address_set_host(&local_address, local_ip.c_str());
+            local_address.port = client_port;
+            room_member_impl->client = enet_host_create(&local_address, 1, NumChannels, 0, 0);
+        }
+        if (!room_member_impl->client) {
+            // Fallback: bind ke semua interface
+            room_member_impl->client = enet_host_create(nullptr, 1, NumChannels, 0, 0);
+        }
         ASSERT_MSG(room_member_impl->client != nullptr, "Could not create client");
     }
 

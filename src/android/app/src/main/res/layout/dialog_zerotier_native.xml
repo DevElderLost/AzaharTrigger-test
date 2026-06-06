@@ -144,5 +144,37 @@
             android:enabled="false"
             android:text="@string/multiplayer_join_room" />
 
-    </LinearLayout>
+    
+        <!-- Tombol room — hanya tampil saat ZeroTier terhubung -->
+        <LinearLayout
+            android:id="@+id/roomButtonsGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCreateRoom"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="@string/multiplayer_create_room" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnJoinRoom"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="@string/multiplayer_join_room" />
+
+        </LinearLayout>
+</LinearLayout>
 </ScrollView>

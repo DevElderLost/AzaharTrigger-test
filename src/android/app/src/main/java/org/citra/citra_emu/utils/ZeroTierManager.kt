@@ -1,20 +1,5 @@
 // Copyright 2025 AzaharTrigger Project
 // Licensed under GPLv2 or any later version
-//
-// ZeroTierManager.kt — Panggil ZeroTierNative static methods via reflection
-//
-// ZeroTierNode methods hilang karena ProGuard obfuskasi.
-// ZeroTierNative menggunakan native methods yang tidak bisa diobfuskasi.
-//
-// Flow via ZeroTierNative:
-//   ZeroTierNative.zts_init_from_storage(path) → setup storage
-//   ZeroTierNative.zts_node_start()            → mulai node
-//   ZeroTierNative.zts_node_is_online()        → 1 jika online
-//   ZeroTierNative.zts_net_join(networkId)     → join network
-//   ZeroTierNative.zts_net_transport_is_ready(id) → 1 jika siap
-//   ZeroTierNative.zts_addr_get_str(id, AF_INET)  → IP string
-//   ZeroTierNative.zts_node_stop()             → stop
-
 package org.citra.citra_emu.utils
 
 import android.content.Context
@@ -26,12 +11,10 @@ object ZeroTierManager {
     private const val PREFS_KEY  = "zerotier_prefs"
     private const val KEY_NET    = "zt_network_id"
     private const val ZT_NATIVE  = "com.zerotier.sockets.ZeroTierNative"
-
-    // ZTS_AF_INET = 2 (dari ZeroTierNative.java)
     private const val ZTS_AF_INET = 2
     private const val ZTS_ERR_OK  = 0
 
-    enum class State { IDLE, STARTING, READY, ERROR }
+    enum class State { IDLE, STARTING, READY, STOPPING, ERROR }
 
     @Volatile var state: State = State.IDLE
         private set
@@ -50,23 +33,11 @@ object ZeroTierManager {
 
     fun hasNetworkId(context: Context) = getNetworkId(context).length == 16
 
-    // Panggil static method di ZeroTierNative via reflection
     private fun callStatic(methodName: String, vararg args: Any?): Any? {
-        val cls = ztNativeClass ?: throw Exception("ZeroTierNative belum diinisialisasi")
-        val argTypes = args.map { a ->
-            when (a) {
-                is Long    -> Long::class.java
-                is Int     -> Int::class.java
-                is String  -> String::class.java
-                is Boolean -> Boolean::class.java
-                else       -> a?.javaClass
-            }
-        }
-        // Cari method dengan nama dan parameter count
+        val cls = ztNativeClass ?: return null
         val method = cls.methods.firstOrNull { m ->
             m.name == methodName && m.parameterTypes.size == args.size
-        } ?: throw Exception("$methodName(${args.size} params) tidak ditemukan di ZeroTierNative")
-
+        } ?: throw Exception("$methodName(${args.size} params) tidak ditemukan")
         return method.invoke(null, *args)
     }
 
@@ -78,6 +49,7 @@ object ZeroTierManager {
     ) {
         if (state == State.READY) { onReady(assignedIp); return }
         if (state == State.STARTING) { onError("Sedang inisialisasi..."); return }
+        if (state == State.STOPPING) { onError("Sedang memutus koneksi..."); return }
         state = State.STARTING
 
         val storagePath = File(context.filesDir, "zt/$networkId")
@@ -89,62 +61,42 @@ object ZeroTierManager {
 
         Thread {
             try {
-                Log.i(TAG, "Init via ZeroTierNative storage=$storagePath network=$networkId")
-
-                // Load ZeroTierNative — static block otomatis:
-                // System.loadLibrary("zt") + zts_init()
-                val cls = try {
-                    Class.forName(ZT_NATIVE)
-                } catch (e: ClassNotFoundException) {
-                    throw Exception("ZeroTierNative tidak ditemukan. Pastikan libzt-release.aar ada di app/libs/")
-                }
+                Log.i(TAG, "Init ZeroTierNative storage=$storagePath network=$networkId")
+                val cls = Class.forName(ZT_NATIVE)
                 ztNativeClass = cls
 
-                // Log method yang tersedia
-                val methods = cls.methods.filter { it.name.startsWith("zts_") }
-                    .sortedBy { it.name }
-                    .joinToString(", ") { it.name }
-                Log.d(TAG, "ZTS methods: $methods")
-
-                // ── 1. zts_init_from_storage(path) ───────────────────
                 val r1 = callStatic("zts_init_from_storage", storagePath) as? Int ?: -1
                 Log.i(TAG, "zts_init_from_storage=$r1")
 
-                // ── 2. zts_node_start() ───────────────────────────────
                 val r2 = callStatic("zts_node_start") as? Int ?: -1
                 Log.i(TAG, "zts_node_start=$r2")
                 if (r2 != ZTS_ERR_OK) throw Exception("zts_node_start gagal: code=$r2")
 
-                // ── 3. Tunggu zts_node_is_online() == 1 ──────────────
                 Log.i(TAG, "Menunggu node online...")
                 val t0 = System.currentTimeMillis()
                 while (System.currentTimeMillis() - t0 < 15000) {
+                    if (state == State.IDLE) return@Thread // dibatalkan
                     val online = callStatic("zts_node_is_online") as? Int ?: 0
                     if (online == 1) { Log.i(TAG, "Node online!"); break }
                     Thread.sleep(200)
                 }
-                val isOnline = callStatic("zts_node_is_online") as? Int ?: 0
-                if (isOnline != 1) throw Exception(
-                    "Timeout — node tidak online. Cek koneksi internet."
-                )
+                if (callStatic("zts_node_is_online") as? Int != 1)
+                    throw Exception("Timeout — node tidak online. Cek koneksi internet.")
 
-                // ── 4. zts_net_join(networkId) ────────────────────────
                 val r4 = callStatic("zts_net_join", netIdLong) as? Int ?: -1
                 Log.i(TAG, "zts_net_join=$r4")
                 if (r4 != ZTS_ERR_OK) throw Exception("zts_net_join gagal: code=$r4")
 
-                // ── 5. Tunggu transport ready + ambil IP ──────────────
                 Log.i(TAG, "Menunggu IP...")
                 var ip = ""
                 val t1 = System.currentTimeMillis()
                 while (System.currentTimeMillis() - t1 < 25000) {
+                    if (state == State.IDLE) return@Thread
                     val ready = callStatic("zts_net_transport_is_ready", netIdLong) as? Int ?: 0
                     if (ready == 1) {
                         val addr = callStatic("zts_addr_get_str", netIdLong, ZTS_AF_INET) as? String ?: ""
-                        Log.d(TAG, "IP candidate: '$addr'")
                         if (addr.isNotEmpty() && addr != "0.0.0.0" &&
-                            addr != "null" && !addr.startsWith("0.") &&
-                            addr.contains(".")) {
+                            addr != "null" && addr.contains(".")) {
                             ip = addr; break
                         }
                     }
@@ -152,8 +104,7 @@ object ZeroTierManager {
                 }
 
                 if (ip.isEmpty()) throw Exception(
-                    "IP tidak diterima. Authorize node:\n" +
-                    "my.zerotier.com → Networks → Members → ✓ Auth"
+                    "IP tidak diterima. Authorize node:\nmy.zerotier.com → Networks → Members → ✓ Auth"
                 )
 
                 assignedIp = ip
@@ -163,43 +114,69 @@ object ZeroTierManager {
 
             } catch (e: ExceptionInInitializerError) {
                 state = State.ERROR
-                val msg = "libzt.so tidak ditemukan. " +
-                    "AAR arm64-v8a diperlukan: ${e.cause?.message ?: e.message}"
-                Log.e(TAG, msg, e)
-                onError(msg)
+                onError("libzt.so tidak ditemukan: ${e.cause?.message ?: e.message}")
             } catch (e: ClassNotFoundException) {
                 state = State.ERROR
                 onError("libzt AAR tidak ditemukan di app/libs/")
             } catch (e: Exception) {
                 state = State.ERROR
-                val msg = e.cause?.message ?: e.message ?: "Error tidak diketahui"
-                Log.e(TAG, "ZeroTier error: $msg", e)
-                onError(msg)
+                onError(e.cause?.message ?: e.message ?: "Error tidak diketahui")
             }
         }.start()
     }
 
-    fun shutdown() {
-        if (state == State.IDLE) return
-        // Set IDLE dulu agar tidak ada thread lain yang masuk
-        state = State.IDLE
+    fun shutdown(onDone: (() -> Unit)? = null) {
+        if (state == State.IDLE || state == State.STOPPING) return
+        state = State.STOPPING
+
+        // Reset state dulu agar UI tidak menunggu
+        val netId = currentNetworkId
+        val cls   = ztNativeClass
+        assignedIp       = ""
+        currentNetworkId = 0L
+        ztNativeClass    = null
+
         Thread {
             try {
-                if (ztNativeClass != null) {
-                    if (currentNetworkId != 0L) {
-                        try { callStatic("zts_net_leave", currentNetworkId) }
-                        catch (e: Exception) { Log.w(TAG, "leave: ${e.message}") }
+                if (cls != null) {
+                    // leave network dulu
+                    if (netId != 0L) {
+                        try {
+                            val m = cls.methods.firstOrNull {
+                                it.name == "zts_net_leave" && it.parameterTypes.size == 1
+                            }
+                            m?.invoke(null, netId)
+                            Thread.sleep(500) // beri waktu leave selesai
+                        } catch (e: Exception) {
+                            Log.w(TAG, "leave error: ${e.message}")
+                        }
                     }
-                    try { callStatic("zts_node_stop") }
-                    catch (e: Exception) { Log.w(TAG, "stop: ${e.message}") }
+                    // stop node
+                    try {
+                        val m = cls.methods.firstOrNull {
+                            it.name == "zts_node_stop" && it.parameterTypes.isEmpty()
+                        }
+                        m?.invoke(null)
+                        Thread.sleep(300) // beri waktu stop selesai
+                    } catch (e: Exception) {
+                        Log.w(TAG, "stop error: ${e.message}")
+                    }
+                    // free node resources
+                    try {
+                        val m = cls.methods.firstOrNull {
+                            it.name == "zts_node_free" && it.parameterTypes.isEmpty()
+                        }
+                        m?.invoke(null)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "free error: ${e.message}")
+                    }
                 }
                 Log.i(TAG, "ZeroTier stopped")
             } catch (e: Exception) {
                 Log.e(TAG, "Shutdown error: ${e.message}")
             } finally {
-                assignedIp        = ""
-                currentNetworkId  = 0L
-                ztNativeClass     = null
+                state = State.IDLE
+                onDone?.invoke()
             }
         }.start()
     }
