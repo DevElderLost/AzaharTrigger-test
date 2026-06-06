@@ -1030,11 +1030,14 @@ bool Room::Create(const std::string& name, const std::string& description,
                   std::unique_ptr<VerifyUser::Backend> verify_backend,
                   const Room::BanList& ban_list) {
     ENetAddress address;
+    // Selalu bind ke ENET_HOST_ANY (0.0.0.0) agar server mendengarkan
+    // di semua network interface termasuk ZeroTier virtual interface.
+    // Jika bind ke IP spesifik (terutama ZeroTier IP), ENet akan gagal
+    // karena ZeroTier virtual interface tidak selalu dikenali sebagai
+    // interface standar oleh Android.
     address.host = ENET_HOST_ANY;
-    if (!server_address.empty()) {
-        enet_address_set_host(&address, server_address.c_str());
-    }
     address.port = server_port;
+    (void)server_address; // server_address tetap disimpan untuk informasi room
 
     // In order to send the room is full message to the connecting client, we need to leave one
     // slot open so enet won't reject the incoming connection without telling us
