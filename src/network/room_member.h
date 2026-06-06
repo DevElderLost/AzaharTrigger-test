@@ -164,7 +164,8 @@ public:
     void Join(const std::string& nickname, const std::string& console_id_hash,
               const char* server_addr = "127.0.0.1", u16 server_port = DefaultRoomPort,
               u16 client_port = 0, const MacAddress& preferred_mac = NoPreferredMac,
-              const std::string& password = "", const std::string& token = "");
+              const std::string& password = "", const std::string& token = "",
+              const std::string& local_ip = {});
 
     /**
      * Sends a WiFi packet to the room.
