@@ -619,7 +619,17 @@ void RoomMember::Join(const std::string& nick, const std::string& console_id_has
     room_member_impl->SetState(State::Joining);
 
     ENetAddress address{};
-    enet_address_set_host(&address, server_addr);
+    // Gunakan enet_address_set_ip untuk menghindari DNS lookup
+    // DNS lookup gagal untuk ZeroTier virtual IP di Android
+    // enet_address_set_ip() langsung parse dotted-decimal IP string
+    if (enet_address_set_ip(&address, server_addr) != 0) {
+        // Fallback ke enet_address_set_host jika bukan IP address
+        if (enet_address_set_host(&address, server_addr) != 0) {
+            room_member_impl->SetState(State::Idle);
+            room_member_impl->SetError(Error::CouldNotConnect);
+            return;
+        }
+    }
     address.port = server_port;
     room_member_impl->server =
         enet_host_connect(room_member_impl->client, &address, NumChannels, 0);
