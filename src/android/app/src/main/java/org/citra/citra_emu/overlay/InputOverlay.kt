@@ -26,6 +26,7 @@ import org.citra.citra_emu.NativeLibrary
 import org.citra.citra_emu.R
 import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.utils.TurboHelper
+import org.citra.citra_emu.overlay.ComboButtonManager
 import java.lang.NullPointerException
 import kotlin.math.min
 
@@ -171,16 +172,20 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
 
                     if (button.id == NativeLibrary.ButtonType.BUTTON_SWAP && button.status == NativeLibrary.ButtonState.PRESSED) {
                         swapScreen()
-                    }
-                    else if (button.id == NativeLibrary.ButtonType.BUTTON_TURBO && button.status == NativeLibrary.ButtonState.PRESSED) {
+                    } else if (button.id == NativeLibrary.ButtonType.BUTTON_TURBO && button.status == NativeLibrary.ButtonState.PRESSED) {
                         TurboHelper.toggleTurbo(true)
                     }
 
-                    NativeLibrary.onGamePadEvent(
-                        NativeLibrary.TouchScreenDevice,
-                        button.id,
-                        button.status
-                    )
+                    if (ComboButtonManager.isComboButton(button.id)) {
+                        // Fire all native buttons assigned to this combo slot simultaneously
+                        ComboButtonManager.dispatchComboEvent(button.id, button.status)
+                    } else {
+                        NativeLibrary.onGamePadEvent(
+                            NativeLibrary.TouchScreenDevice,
+                            button.id,
+                            button.status
+                        )
+                    }
 
                     shouldUpdateView = true
                 }
@@ -568,6 +573,31 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 )
             )
         }
+
+        // ── Combo Buttons 1–5 (buttonToggle20–24) ────────────────────────
+        val comboIds = intArrayOf(
+            ComboButtonManager.COMBO_BUTTON_1,
+            ComboButtonManager.COMBO_BUTTON_2,
+            ComboButtonManager.COMBO_BUTTON_3,
+            ComboButtonManager.COMBO_BUTTON_4,
+            ComboButtonManager.COMBO_BUTTON_5,
+        )
+        for (i in comboIds.indices) {
+            val slot = i + 1
+            val toggleKey = "buttonToggle${16 + i}"
+            if (preferences.getBoolean(toggleKey, false)) {
+                // Set posisi default jika belum ada di prefs
+                overlayButtons.add(
+                    initializeOverlayButton(
+                        context,
+                        R.drawable.button_turbo,
+                        R.drawable.button_turbo_pressed,
+                        comboIds[i],
+                        orientation
+                    )
+                )
+            }
+        }
     }
 
     fun refreshControls() {
@@ -619,6 +649,21 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             if (aButtonPositionPortrait == 0f) {
                 defaultOverlayPortrait()
             }
+        }
+
+        // Cek posisi combo button — jalankan default jika belum ada
+        // (user yang sudah install sebelum combo ditambahkan tidak punya key ini)
+        val combo1Position = preferences.getFloat(
+            "${ComboButtonManager.COMBO_BUTTON_1}-X", -1f
+        )
+        if (combo1Position == -1f) {
+            defaultOverlayLandscape()
+        }
+        val combo1PositionPortrait = preferences.getFloat(
+            "${ComboButtonManager.COMBO_BUTTON_1}-Portrait-X", -1f
+        )
+        if (combo1PositionPortrait == -1f) {
+            defaultOverlayPortrait()
         }
 
         preferences.edit()
@@ -781,6 +826,17 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 NativeLibrary.ButtonType.BUTTON_TURBO.toString() + "-Y",
                 resources.getInteger(R.integer.N3DS_BUTTON_TURBO_Y).toFloat() / 1000 * maxY
             )
+            // Combo Buttons default positions (landscape) — left side, below joystick
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_1}-X", 0.01f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_1}-Y", 0.65f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_2}-X", 0.07f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_2}-Y", 0.65f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_3}-X", 0.13f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_3}-Y", 0.65f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_4}-X", 0.01f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_4}-Y", 0.80f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_5}-X", 0.07f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_5}-Y", 0.80f * maxY)
             .apply()
     }
 
@@ -932,6 +988,17 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 NativeLibrary.ButtonType.BUTTON_TURBO.toString() + portrait + "-Y",
                 resources.getInteger(R.integer.N3DS_BUTTON_TURBO_PORTRAIT_Y).toFloat() / 1000 * maxY
             )
+            // Combo Buttons default positions (portrait)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_1}$portrait-X", 0.02f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_1}$portrait-Y", 0.75f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_2}$portrait-X", 0.12f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_2}$portrait-Y", 0.75f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_3}$portrait-X", 0.22f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_3}$portrait-Y", 0.75f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_4}$portrait-X", 0.02f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_4}$portrait-Y", 0.85f * maxY)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_5}$portrait-X", 0.12f * maxX)
+            .putFloat("${ComboButtonManager.COMBO_BUTTON_5}$portrait-Y", 0.85f * maxY)
             .apply()
     }
 
@@ -1050,6 +1117,12 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 NativeLibrary.ButtonType.TRIGGER_R,
                 NativeLibrary.ButtonType.BUTTON_ZL,
                 NativeLibrary.ButtonType.BUTTON_ZR -> 0.18f
+
+                ComboButtonManager.COMBO_BUTTON_1,
+                ComboButtonManager.COMBO_BUTTON_2,
+                ComboButtonManager.COMBO_BUTTON_3,
+                ComboButtonManager.COMBO_BUTTON_4,
+                ComboButtonManager.COMBO_BUTTON_5 -> 0.10f
 
                 else -> 0.11f
             }
