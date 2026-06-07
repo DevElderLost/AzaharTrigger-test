@@ -574,7 +574,7 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             )
         }
 
-        // ── Combo Buttons 1–5 (buttonToggle20–24) ────────────────────────
+        // ── Combo Buttons 1–5 (buttonToggle16–20) ────────────────────────
         val comboIds = intArrayOf(
             ComboButtonManager.COMBO_BUTTON_1,
             ComboButtonManager.COMBO_BUTTON_2,
@@ -582,16 +582,28 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             ComboButtonManager.COMBO_BUTTON_4,
             ComboButtonManager.COMBO_BUTTON_5,
         )
+        val comboDefaultDrawables = intArrayOf(
+            R.drawable.combo_button_1,
+            R.drawable.combo_button_2,
+            R.drawable.combo_button_3,
+            R.drawable.combo_button_4,
+            R.drawable.combo_button_5,
+        )
+        val comboPressedDrawables = intArrayOf(
+            R.drawable.combo_button_1_pressed,
+            R.drawable.combo_button_2_pressed,
+            R.drawable.combo_button_3_pressed,
+            R.drawable.combo_button_4_pressed,
+            R.drawable.combo_button_5_pressed,
+        )
         for (i in comboIds.indices) {
-            val slot = i + 1
             val toggleKey = "buttonToggle${16 + i}"
             if (preferences.getBoolean(toggleKey, false)) {
-                // Set posisi default jika belum ada di prefs
                 overlayButtons.add(
                     initializeOverlayButton(
                         context,
-                        R.drawable.button_turbo,
-                        R.drawable.button_turbo_pressed,
+                        comboDefaultDrawables[i],
+                        comboPressedDrawables[i],
                         comboIds[i],
                         orientation
                     )

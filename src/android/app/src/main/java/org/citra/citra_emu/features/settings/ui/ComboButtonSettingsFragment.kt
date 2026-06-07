@@ -8,12 +8,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewGroup.MarginLayoutParams
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
@@ -24,11 +21,6 @@ import org.citra.citra_emu.databinding.FragmentComboButtonSettingsBinding
 import org.citra.citra_emu.databinding.ItemComboButtonBinding
 import org.citra.citra_emu.overlay.ComboButtonManager
 
-/**
- * Fragment pengaturan Combo Buttons 1–5.
- * Menggunakan Activity toolbar (tidak punya toolbar sendiri),
- * konsisten dengan pola HomeSettingsFragment.
- */
 class ComboButtonSettingsFragment : Fragment() {
 
     private var _binding: FragmentComboButtonSettingsBinding? = null
@@ -52,32 +44,25 @@ class ComboButtonSettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Set judul via Activity toolbar — sama seperti fragment lain
-        (activity as? AppCompatActivity)?.supportActionBar?.apply {
+        // Setup toolbar
+        binding.toolbar.apply {
             title = getString(R.string.combo_button_settings)
-            setDisplayHomeAsUpEnabled(true)
+            setNavigationIcon(R.drawable.ic_back)
+            setNavigationOnClickListener { findNavController().popBackStack() }
         }
 
-        // Handle window insets — status bar + navigation bar
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, windowInsets ->
-            val barInsets    = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            val cutoutInsets = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
+        // Handle status bar inset pada toolbar
+        ViewCompat.setOnApplyWindowInsetsListener(binding.toolbar) { v, insets ->
+            val statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            v.setPadding(v.paddingLeft, statusBar.top, v.paddingRight, v.paddingBottom)
+            insets
+        }
 
-            val leftInset  = barInsets.left  + cutoutInsets.left
-            val rightInset = barInsets.right + cutoutInsets.right
-            val bottomInset = barInsets.bottom
-
-            binding.comboScrollView.updatePadding(
-                left   = leftInset,
-                right  = rightInset,
-                bottom = bottomInset + 80
-            )
-
-            val mlp = binding.comboScrollView.layoutParams as? MarginLayoutParams
-            mlp?.topMargin = barInsets.top
-            binding.comboScrollView.layoutParams = mlp
-
-            windowInsets
+        // Handle navigation bar inset pada ScrollView
+        ViewCompat.setOnApplyWindowInsetsListener(binding.comboScrollView) { v, insets ->
+            val navBar = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, navBar.bottom + 80)
+            insets
         }
 
         // Inflate satu card per slot
@@ -86,23 +71,6 @@ class ComboButtonSettingsFragment : Fragment() {
                 layoutInflater, binding.comboContainer, true
             )
             bindSlot(cardBinding, slot)
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // Set judul setiap kali fragment resume (misal kembali dari back stack)
-        (activity as? AppCompatActivity)?.supportActionBar?.apply {
-            title = getString(R.string.combo_button_settings)
-            setDisplayHomeAsUpEnabled(true)
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        // Kembalikan judul ke default activity saat fragment hilang
-        (activity as? AppCompatActivity)?.supportActionBar?.apply {
-            setDisplayHomeAsUpEnabled(false)
         }
     }
 
@@ -161,18 +129,12 @@ class ComboButtonSettingsFragment : Fragment() {
                         checked[which] = false
                         Toast.makeText(
                             requireContext(),
-                            getString(
-                                R.string.combo_button_max_exceeded,
-                                ComboButtonManager.MAX_BUTTONS_PER_COMBO
-                            ),
+                            getString(R.string.combo_button_max_exceeded,
+                                ComboButtonManager.MAX_BUTTONS_PER_COMBO),
                             Toast.LENGTH_SHORT
                         ).show()
-                    } else {
-                        selected.add(id)
-                    }
-                } else {
-                    selected.remove(id)
-                }
+                    } else selected.add(id)
+                } else selected.remove(id)
             }
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 ComboButtonManager.setButtonsForSlot(slot, selected.toList())
