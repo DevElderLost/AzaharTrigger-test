@@ -1,3 +1,74 @@
+#!/usr/bin/env bash
+# =============================================================================
+# fix_combo_fragment_navigation.sh
+#
+# Fix ComboButtonSettingsFragment agar:
+#   1. Tidak punya toolbar sendiri (pakai Activity toolbar)
+#   2. Back arrow tidak terpotong status bar
+#   3. Navigasi konsisten — Home nav = kembali ke HomeSettings
+#   4. Window insets ditangani seperti HomeSettingsFragment
+# =============================================================================
+
+set -euo pipefail
+RED='\033[0;31m'; GREEN='\033[0;32m'; NC='\033[0m'
+ok() { echo -e "${GREEN}[OK]${NC} $*"; }
+die() { echo -e "${RED}[ERR]${NC} $*"; exit 1; }
+
+BASE=""
+for c in "src/android" "app" "."; do
+    [[ -f "$c/app/src/main/java/org/citra/citra_emu/fragments/HomeSettingsFragment.kt" ]] && BASE="$c" && break
+done
+[[ -n "$BASE" ]] || die "Tidak menemukan repo root."
+ok "Base: $BASE"
+
+APP="$BASE/app/src/main/java/org/citra/citra_emu"
+RES="$BASE/app/src/main/res"
+COMBO_FRAG="$APP/features/settings/ui/ComboButtonSettingsFragment.kt"
+FRAG_LAYOUT="$RES/layout/fragment_combo_button_settings.xml"
+
+# =============================================================================
+# 1. Tulis ulang fragment_combo_button_settings.xml
+#    Hapus MaterialToolbar — pakai activity toolbar
+#    Tambah window insets handling via paddingTop pada ScrollView
+# =============================================================================
+echo ">>> Writing fragment_combo_button_settings.xml..."
+cat > "$FRAG_LAYOUT" << 'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/combo_settings_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:id="@+id/combo_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="80dp">
+
+        <LinearLayout
+            android:id="@+id/combo_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp" />
+
+    </ScrollView>
+
+</LinearLayout>
+XML
+ok "fragment_combo_button_settings.xml rewritten (no toolbar)."
+
+# =============================================================================
+# 2. Tulis ulang ComboButtonSettingsFragment.kt
+#    - Hapus toolbar manual, set judul via (activity as AppCompatActivity)
+#    - Tambah WindowInsets handler sama seperti HomeSettingsFragment
+#    - Navigasi: popBackStack() tetap untuk tombol back hardware/gesture
+#    - Tambah onStop() untuk clear title saat keluar
+# =============================================================================
+echo ">>> Rewriting ComboButtonSettingsFragment.kt..."
+cat > "$COMBO_FRAG" << 'KOTLIN'
 // Copyright Citra Emulator Project / Azahar Emulator Project
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
@@ -191,3 +262,9 @@ class ComboButtonSettingsFragment : Fragment() {
         _binding = null
     }
 }
+KOTLIN
+ok "ComboButtonSettingsFragment.kt rewritten."
+
+echo ""
+echo -e "${GREEN}Done!${NC}"
+echo "git add -A && git commit -m 'fix(ui): use activity toolbar in ComboButtonSettingsFragment, fix insets and navigation' && git push"
