@@ -12,6 +12,8 @@ import android.widget.Toast
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import org.citra.citra_emu.viewmodel.HomeViewModel
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -25,6 +27,8 @@ class ComboButtonSettingsFragment : Fragment() {
 
     private var _binding: FragmentComboButtonSettingsBinding? = null
     private val binding get() = _binding!!
+
+    private val homeViewModel: HomeViewModel by activityViewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,12 +62,6 @@ class ComboButtonSettingsFragment : Fragment() {
             insets
         }
 
-        // Handle navigation bar inset pada ScrollView
-        ViewCompat.setOnApplyWindowInsetsListener(binding.comboScrollView) { v, insets ->
-            val navBar = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, navBar.bottom + 80)
-            insets
-        }
 
         // Inflate satu card per slot
         for (slot in 1..ComboButtonManager.COMBO_COUNT) {
@@ -146,6 +144,20 @@ class ComboButtonSettingsFragment : Fragment() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Sembunyikan bottom navigation — sama seperti fragment settings lain
+        homeViewModel.setNavigationVisibility(visible = false, animated = true)
+        homeViewModel.setStatusBarShadeVisibility(visible = false)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Tampilkan kembali saat keluar dari fragment ini
+        homeViewModel.setNavigationVisibility(visible = true, animated = true)
+        homeViewModel.setStatusBarShadeVisibility(visible = true)
     }
 
     override fun onDestroyView() {
