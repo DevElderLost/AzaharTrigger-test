@@ -212,12 +212,19 @@ NetPlayStatus AndroidMultiplayer::NetPlayJoinRoom(const std::string& ipaddress, 
     member->Join(username, Service::CFG::GetConsoleIdHash(system), ipaddress.c_str(), port, 0,
                  Network::NoPreferredMac, password);
 
-    // Wait a bit for the connection and join process to complete
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    if (member->GetState() == Network::RoomMember::State::Joined ||
-        member->GetState() == Network::RoomMember::State::Moderator) {
-        return NetPlayStatus::NO_ERROR;
+ 
+    // Wait for the connection and join process to complete.
+    // Use a longer timeout (5000ms = 5 seconds) to account for slower LAN networks.
+    // This matches the ConnectionTimeoutMs used in RoomMember::Join()
+    constexpr int JOIN_WAIT_TIMEOUT_MS = 5000;
+    constexpr int JOIN_WAIT_STEP_MS = 100;
+    for (int elapsed = 0; elapsed < JOIN_WAIT_TIMEOUT_MS; elapsed += JOIN_WAIT_STEP_MS) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(JOIN_WAIT_STEP_MS));
+        
+        if (member->GetState() == Network::RoomMember::State::Joined ||
+            member->GetState() == Network::RoomMember::State::Moderator) {
+            return NetPlayStatus::NO_ERROR;
+        }
     }
 
     if (!member->IsConnected()) {
