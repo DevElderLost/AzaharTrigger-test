@@ -855,10 +855,6 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
                     true
                 }
 
-                R.id.menu_emulation_adjust_scale_button_secondary_screen -> {
-                    showAdjustScaleDialog("controlScale-" + NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN)
-                    true
-                }
 
                 R.id.menu_emulation_adjust_scale_combo_1 -> {
                     showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_1)
