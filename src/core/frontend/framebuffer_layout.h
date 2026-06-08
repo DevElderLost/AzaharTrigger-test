@@ -100,6 +100,18 @@ FramebufferLayout PortraitOriginalLayout(u32 width, u32 height, bool is_swapped,
 FramebufferLayout SingleFrameLayout(u32 width, u32 height, bool is_swapped, bool upright);
 
 /**
+ * Factory method for constructing a Single Screen layout with
+ * the bottom screen overlaid on top using custom layout position.
+ * @param width Window framebuffer width in pixels
+ * @param height Window framebuffer height in pixels
+ * @param is_swapped if true, the bottom screen will be the large display
+ * @param upright if true, the screens will be rotated 90 degrees anti-clockwise
+ * @return Newly created FramebufferLayout object with top screen fullscreen
+ *         and bottom screen as overlay using custom layout coordinates
+ */
+FramebufferLayout SingleWithOverlayFrameLayout(u32 width, u32 height, bool is_swapped, bool upright);
+
+/**
  * Factory method for constructing a Frame with differently sized top and bottom windows
  * @param width Window framebuffer width in pixels
  * @param height Window framebuffer height in pixels

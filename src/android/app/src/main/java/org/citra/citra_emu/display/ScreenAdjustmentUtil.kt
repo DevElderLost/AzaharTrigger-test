@@ -67,10 +67,10 @@ class ScreenAdjustmentUtil(
             // Native core akan membaca LANDSCAPE_BOTTOM_X/Y/WIDTH/HEIGHT
             // dari settings untuk menentukan posisi & ukuran layar kedua
             if (NativeLibrary.isPortraitMode) {
-                IntSetting.PORTRAIT_SCREEN_LAYOUT.int = ScreenLayout.CUSTOM_LAYOUT.int
+                IntSetting.PORTRAIT_SCREEN_LAYOUT.int = ScreenLayout.SINGLE_WITH_OVERLAY.int
                 settings.saveSetting(IntSetting.PORTRAIT_SCREEN_LAYOUT, SettingsFile.FILE_NAME_CONFIG)
             } else {
-                IntSetting.SCREEN_LAYOUT.int = ScreenLayout.CUSTOM_LAYOUT.int
+                IntSetting.SCREEN_LAYOUT.int = ScreenLayout.SINGLE_WITH_OVERLAY.int
                 settings.saveSetting(IntSetting.SCREEN_LAYOUT, SettingsFile.FILE_NAME_CONFIG)
             }
         } else {

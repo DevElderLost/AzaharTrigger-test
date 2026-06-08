@@ -102,15 +102,13 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
      */
     private fun isTouchScreenVisible(): Boolean {
         val layout = IntSetting.SCREEN_LAYOUT.int
-        val isSingleScreen = layout == ScreenLayout.SINGLE_SCREEN.int
-        // Saat single screen: cek apakah user mengaktifkan show secondary screen
-        // Ketika showSecondaryScreen = ON, layout sudah diubah ke CUSTOM_LAYOUT
-        // oleh toggleSecondaryScreen(), jadi isSingleScreen = false otomatis.
-        // Guard ini sebagai fallback keamanan tambahan.
-        if (isSingleScreen) {
-            return EmulationMenuSettings.showSecondaryScreen
+        // SINGLE_SCREEN: blokir touch layar kedua
+        // SINGLE_WITH_OVERLAY: izinkan touch layar kedua (overlay aktif)
+        // Mode lain: selalu izinkan
+        return when (layout) {
+            ScreenLayout.SINGLE_SCREEN.int -> false
+            else -> true
         }
-        return true
     }
 
     override fun onTouch(v: View, event: MotionEvent): Boolean {

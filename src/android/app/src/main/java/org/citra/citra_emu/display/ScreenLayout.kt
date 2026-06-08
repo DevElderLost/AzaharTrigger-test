@@ -11,7 +11,8 @@ enum class ScreenLayout(val int: Int) {
     LARGE_SCREEN(2),
     SIDE_SCREEN(3),
     HYBRID_SCREEN(4),
-    CUSTOM_LAYOUT(5);
+    CUSTOM_LAYOUT(5),
+    SINGLE_WITH_OVERLAY(6);
 
 
     companion object {

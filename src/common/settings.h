@@ -47,6 +47,7 @@ enum class LayoutOption : u32 { // Shouldn't these have set numbers to prevent l
 #endif
     HybridScreen,
     CustomLayout,
+        SingleWithOverlay,  // Single screen with bottom screen overlay
 };
 
 /** Defines the layout option for mobile portrait */

@@ -91,6 +91,57 @@ FramebufferLayout SingleFrameLayout(u32 width, u32 height, bool swapped, bool up
     if (upright) {
         std::swap(width, height);
     }
+
+FramebufferLayout SingleWithOverlayFrameLayout(u32 width, u32 height, bool is_swapped,
+                                               bool upright) {
+    ASSERT(width > 0);
+    ASSERT(height > 0);
+
+    if (upright) {
+        std::swap(width, height);
+    }
+
+    FramebufferLayout res{width, height, true, true, {}, {}, !upright};
+
+    // Top screen (primary) takes the full window - same as SingleScreen
+    Common::Rectangle<u32> screen_window_area{0, 0, width, height};
+    Common::Rectangle<u32> top_screen{0, 0, Core::kScreenTopWidth, Core::kScreenTopHeight};
+    Common::Rectangle<u32> bot_screen{0, 0, Core::kScreenBottomWidth, Core::kScreenBottomHeight};
+
+    const float window_aspect_ratio = static_cast<float>(height) / static_cast<float>(width);
+
+    // Top screen fills the entire display
+    res.top_screen = MaxRectangle(screen_window_area, top_screen);
+
+    // Bottom screen uses custom layout position as overlay
+    // Read position from custom layout settings
+    u32 bot_x = static_cast<u32>(Settings::values.custom_bottom_x.GetValue());
+    u32 bot_y = static_cast<u32>(Settings::values.custom_bottom_y.GetValue());
+    u32 bot_w = static_cast<u32>(Settings::values.custom_bottom_width.GetValue());
+    u32 bot_h = static_cast<u32>(Settings::values.custom_bottom_height.GetValue());
+
+    // Scale the overlay position to match the current window size
+    // Custom layout is defined in 800x480 space (top screen resolution)
+    const float scale_x = static_cast<float>(width) / static_cast<float>(Core::kScreenTopWidth);
+    const float scale_y = static_cast<float>(height) / static_cast<float>(Core::kScreenTopHeight);
+
+    u32 scaled_x = static_cast<u32>(bot_x * scale_x);
+    u32 scaled_y = static_cast<u32>(bot_y * scale_y);
+    u32 scaled_w = static_cast<u32>(bot_w * scale_x);
+    u32 scaled_h = static_cast<u32>(bot_h * scale_y);
+
+    // Clamp to window bounds
+    if (scaled_x + scaled_w > width)  scaled_w = width - scaled_x;
+    if (scaled_y + scaled_h > height) scaled_h = height - scaled_y;
+
+    res.bottom_screen = {scaled_x, scaled_y, scaled_x + scaled_w, scaled_y + scaled_h};
+
+    if (is_swapped) {
+        return reverseLayout(res);
+    }
+    return res;
+}
+
     FramebufferLayout res{width, height, !swapped, swapped, {}, {}, !upright};
 
     Common::Rectangle<u32> screen_window_area{0, 0, width, height};
@@ -430,7 +481,14 @@ FramebufferLayout FrameLayoutFromResolutionScale(u32 res_scale, bool is_secondar
             if (swap_screens) {
                 width = Core::kScreenBottomWidth * res_scale;
                 height = Core::kScreenBottomHeight * res_scale;
-            } else {
+            }
+        case Settings::LayoutOption::SingleWithOverlay: {
+            layout = SingleWithOverlayFrameLayout(res_scale * Core::kScreenTopWidth,
+                                                  res_scale * Core::kScreenTopHeight,
+                                                  Settings::values.swap_screen.GetValue(),
+                                                  is_portrait_mode);
+            break;
+        } else {
                 width = Core::kScreenTopWidth * res_scale;
                 height = Core::kScreenTopHeight * res_scale;
             }
