@@ -23,8 +23,6 @@ import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
 import org.citra.citra_emu.CitraApplication
 import org.citra.citra_emu.NativeLibrary
-import org.citra.citra_emu.features.settings.model.IntSetting
-import org.citra.citra_emu.display.ScreenLayout
 import org.citra.citra_emu.R
 import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.utils.TurboHelper
@@ -95,26 +93,6 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             performHapticFeedback(type)
     }
 
-    /**
-     * Returns true jika touchscreen 3DS (layar bawah) seharusnya
-     * menerima input sentuh. Pada mode SINGLE_SCREEN, layar bawah
-     * tidak ditampilkan sehingga touch input ke area itu harus diblokir.
-     */
-    private fun isTouchScreenVisible(): Boolean {
-        val layout = IntSetting.SCREEN_LAYOUT.int
-        val isSingleScreen = layout == ScreenLayout.SINGLE_SCREEN.int
-        // Saat single screen: cek apakah user mengaktifkan show secondary screen
-        // Ketika showSecondaryScreen = ON, layout sudah diubah ke CUSTOM_LAYOUT
-        // oleh toggleSecondaryScreen(), jadi isSingleScreen = false otomatis.
-        // Guard ini sebagai fallback keamanan tambahan.
-        if (isSingleScreen) {
-            return EmulationMenuSettings.showSecondaryScreen
-        }
-        return true
-    }
-        return true
-    }
-
     override fun onTouch(v: View, event: MotionEvent): Boolean {
         if (isInEditMode) {
             return onTouchWhileEditing(event)
@@ -174,18 +152,10 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
 
             if (preferences.getBoolean("isTouchEnabled", true) && !hasActiveOverlay) {
                 if (isActionMove) {
-                    if (isTouchScreenVisible()) {
-
-                        NativeLibrary.onTouchMoved(xPosition.toFloat(), yPosition.toFloat())
-
-                    }
+                    NativeLibrary.onTouchMoved(xPosition.toFloat(), yPosition.toFloat())
                     continue
                 } else if (isActionUp) {
-                    if (isTouchScreenVisible()) {
-
-                        NativeLibrary.onTouchEvent(0f, 0f, false)
-
-                    }
+                    NativeLibrary.onTouchEvent(0f, 0f, false)
                     break // Up and down actions shouldn't loop
                 }
             }
@@ -202,18 +172,6 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
 
                     if (button.id == NativeLibrary.ButtonType.BUTTON_SWAP && button.status == NativeLibrary.ButtonState.PRESSED) {
                         swapScreen()
-                    }
-                    if (button.id == NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN &&
-                        button.status == NativeLibrary.ButtonState.PRESSED) {
-                        settingsViewModel.settings.let {
-                            (context as? android.app.Activity)?.let { activity ->
-                                org.citra.citra_emu.display.ScreenAdjustmentUtil(
-                                    activity,
-                                    activity.windowManager,
-                                    it
-                                ).toggleSecondaryScreen()
-                            }
-                        }
                     } else if (button.id == NativeLibrary.ButtonType.BUTTON_TURBO && button.status == NativeLibrary.ButtonState.PRESSED) {
                         TurboHelper.toggleTurbo(true)
                     }
@@ -615,17 +573,6 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 )
             )
         }
-                if (preferences.getBoolean("buttonToggle21", false)) {
-                    overlayButtons.add(
-                        initializeOverlayButton(
-                            context,
-                            R.drawable.button_secondary_screen,
-                            R.drawable.button_secondary_screen_pressed,
-                            NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN,
-                            orientation
-                        )
-                    )
-                }
 
         // ── Combo Buttons 1–5 (buttonToggle16–20) ────────────────────────
         val comboIds = intArrayOf(
@@ -883,14 +830,6 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 NativeLibrary.ButtonType.BUTTON_SWAP.toString() + "-Y",
                 resources.getInteger(R.integer.N3DS_BUTTON_SWAP_Y).toFloat() / 1000 * maxY
             )
-                .putFloat(
-                    NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN.toString() + "-X",
-                    resources.getInteger(R.integer.N3DS_BUTTON_SWAP_X).toFloat() / 1000 * maxX - 0.05f * maxX
-                )
-                .putFloat(
-                    NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN.toString() + "-Y",
-                    resources.getInteger(R.integer.N3DS_BUTTON_SWAP_Y).toFloat() / 1000 * maxY
-                )
             .putFloat(
                 NativeLibrary.ButtonType.BUTTON_TURBO.toString() + "-X",
                 resources.getInteger(R.integer.N3DS_BUTTON_TURBO_X).toFloat() / 1000 * maxX
@@ -1183,8 +1122,7 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 NativeLibrary.ButtonType.BUTTON_HOME,
                 NativeLibrary.ButtonType.BUTTON_START,
                 NativeLibrary.ButtonType.BUTTON_SELECT,
-                NativeLibrary.ButtonType.BUTTON_SWAP,
-                    NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN -> 0.08f
+                NativeLibrary.ButtonType.BUTTON_SWAP -> 0.08f
                 NativeLibrary.ButtonType.BUTTON_TURBO -> 0.10f
 
                 NativeLibrary.ButtonType.TRIGGER_L,

@@ -109,10 +109,6 @@
                 <item
                     android:id="@+id/menu_emulation_adjust_scale_combo_5"
                     android:title="@string/emulation_combo5_scale" />
-    <item
-        android:id="@+id/menu_show_secondary_screen"
-        android:title="@string/emulation_show_secondary_screen"
-        android:checkable="true" />
 </menu>
     </item>
 

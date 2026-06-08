@@ -56,14 +56,6 @@ object EmulationMenuSettings {
                 .putBoolean("EmulationMenuSettings_ShowOverlay", value)
                 .apply()
         }
-
-    var showSecondaryScreen: Boolean
-        get() = preferences.getBoolean("EmulationMenuSettings_ShowSecondaryScreen", false)
-        set(value) {
-            preferences.edit()
-                .putBoolean("EmulationMenuSettings_ShowSecondaryScreen", value)
-                .apply()
-        }
     var drawerLockMode: Int
         get() = preferences.getInt(
             "EmulationMenuSettings_DrawerLockMode",

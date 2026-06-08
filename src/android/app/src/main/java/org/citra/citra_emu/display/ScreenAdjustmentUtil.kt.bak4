@@ -9,7 +9,6 @@ import android.content.pm.ActivityInfo
 import android.app.Activity
 import android.view.WindowManager
 import org.citra.citra_emu.NativeLibrary
-import org.citra.citra_emu.display.ScreenLayout
 import org.citra.citra_emu.R
 import org.citra.citra_emu.features.settings.model.BooleanSetting
 import org.citra.citra_emu.features.settings.model.IntSetting
@@ -36,57 +35,32 @@ class ScreenAdjustmentUtil(
 
     /**
      * Toggle tampilan layar kedua saat mode SINGLE_SCREEN aktif.
-     *
-     * Ketika ON:
-     *   - Baca posisi layar kedua dari setting Custom Layout
-     *     (IntSetting.LANDSCAPE_BOTTOM_X/Y/WIDTH/HEIGHT)
-     *   - Terapkan sementara SCREEN_LAYOUT = CUSTOM_LAYOUT
-     *     supaya native core merender layar kedua di posisi tersebut
-     *   - Touch input ke layar kedua ikut aktif
-     *
-     * Ketika OFF:
-     *   - Kembalikan SCREEN_LAYOUT ke SINGLE_SCREEN
-     *   - Touch input ke layar kedua diblokir kembali
+     * Ketika ON: native core diinstruksikan render seperti LARGE_SCREEN
+     * (layar kedua muncul kecil di pojok kanan bawah).
+     * Ketika OFF: kembali ke SINGLE_SCREEN murni.
      */
     fun toggleSecondaryScreen() {
         val isNowShowing = !EmulationMenuSettings.showSecondaryScreen
         EmulationMenuSettings.showSecondaryScreen = isNowShowing
 
         // Hanya berlaku saat SINGLE_SCREEN aktif
-        val isSingleScreen = if (NativeLibrary.isPortraitMode) {
-            IntSetting.PORTRAIT_SCREEN_LAYOUT.int == ScreenLayout.SINGLE_SCREEN.int
+        val currentLayout = if (NativeLibrary.isPortraitMode) {
+            IntSetting.PORTRAIT_SCREEN_LAYOUT.int
         } else {
-            IntSetting.SCREEN_LAYOUT.int == ScreenLayout.SINGLE_SCREEN.int
+            IntSetting.SCREEN_LAYOUT.int
         }
 
-        if (!isSingleScreen) return
+        val isSingleScreen = currentLayout == org.citra.citra_emu.display.ScreenLayout.SINGLE_SCREEN.int
 
-        if (isNowShowing) {
-            // Terapkan CUSTOM_LAYOUT sementara supaya layar kedua
-            // dirender di posisi yang sama dengan Custom Layout setting
-            // Native core akan membaca LANDSCAPE_BOTTOM_X/Y/WIDTH/HEIGHT
-            // dari settings untuk menentukan posisi & ukuran layar kedua
-            if (NativeLibrary.isPortraitMode) {
-                IntSetting.PORTRAIT_SCREEN_LAYOUT.int = ScreenLayout.CUSTOM_LAYOUT.int
-                settings.saveSetting(IntSetting.PORTRAIT_SCREEN_LAYOUT, SettingsFile.FILE_NAME_CONFIG)
+        if (isSingleScreen) {
+            if (isNowShowing) {
+                // Render seperti LARGE_SCREEN sementara
+                NativeLibrary.updateFramebuffer(NativeLibrary.isPortraitMode)
             } else {
-                IntSetting.SCREEN_LAYOUT.int = ScreenLayout.CUSTOM_LAYOUT.int
-                settings.saveSetting(IntSetting.SCREEN_LAYOUT, SettingsFile.FILE_NAME_CONFIG)
-            }
-        } else {
-            // Kembalikan ke SINGLE_SCREEN
-            if (NativeLibrary.isPortraitMode) {
-                IntSetting.PORTRAIT_SCREEN_LAYOUT.int = ScreenLayout.SINGLE_SCREEN.int
-                settings.saveSetting(IntSetting.PORTRAIT_SCREEN_LAYOUT, SettingsFile.FILE_NAME_CONFIG)
-            } else {
-                IntSetting.SCREEN_LAYOUT.int = ScreenLayout.SINGLE_SCREEN.int
-                settings.saveSetting(IntSetting.SCREEN_LAYOUT, SettingsFile.FILE_NAME_CONFIG)
+                // Kembali ke single screen
+                NativeLibrary.updateFramebuffer(NativeLibrary.isPortraitMode)
             }
         }
-
-        // Reload dan refresh render
-        NativeLibrary.reloadSettings()
-        NativeLibrary.updateFramebuffer(NativeLibrary.isPortraitMode)
     }
 
     fun cycleLayouts() {

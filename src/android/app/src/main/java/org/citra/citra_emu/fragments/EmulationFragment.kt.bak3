@@ -855,11 +855,6 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
                     true
                 }
 
-                R.id.menu_emulation_adjust_scale_button_secondary_screen -> {
-                    showAdjustScaleDialog("controlScale-" + NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN)
-                    true
-                }
-
                 R.id.menu_emulation_adjust_scale_combo_1 -> {
                     showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_1)
                     true
@@ -1104,12 +1099,12 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
         val editor = preferences.edit()
         // Indices 0-15  = tombol standar 3DS
         // Indices 16-20 = Combo Button 1-5
-        val enabledButtons = BooleanArray(22)
+        val enabledButtons = BooleanArray(21)
         enabledButtons.forEachIndexed { i: Int, _: Boolean ->
             var defaultValue = true
             when (i) {
                 // Disabled by default: turbo, swap, home, extra, combo buttons
-                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 -> defaultValue = false
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
             }
             enabledButtons[i] = preferences.getBoolean("buttonToggle$i", defaultValue)
         }
@@ -1299,7 +1294,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
             .apply()
 
         val editor = preferences.edit()
-        for (i in 0 until 22) {
+        for (i in 0 until 21) {
             var defaultValue = true
             when (i) {
                 6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
