@@ -201,14 +201,18 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                     }
                     if (button.id == NativeLibrary.ButtonType.BUTTON_SECONDARY_SCREEN &&
                         button.status == NativeLibrary.ButtonState.PRESSED) {
-                        settingsViewModel.settings.let {
-                            (context as? android.app.Activity)?.let { activity ->
-                                org.citra.citra_emu.display.ScreenAdjustmentUtil(
-                                    activity,
-                                    activity.windowManager,
-                                    it
-                                ).toggleSecondaryScreen()
+                        val isNowShowing = !EmulationMenuSettings.showSecondaryScreen
+                        EmulationMenuSettings.showSecondaryScreen = isNowShowing
+                        val isSingleScreen = IntSetting.SCREEN_LAYOUT.int == ScreenLayout.SINGLE_SCREEN.int ||
+                            IntSetting.SCREEN_LAYOUT.int == ScreenLayout.SINGLE_WITH_OVERLAY.int
+                        if (isSingleScreen) {
+                            if (isNowShowing) {
+                                IntSetting.SCREEN_LAYOUT.int = ScreenLayout.SINGLE_WITH_OVERLAY.int
+                            } else {
+                                IntSetting.SCREEN_LAYOUT.int = ScreenLayout.SINGLE_SCREEN.int
                             }
+                            NativeLibrary.reloadSettings()
+                            NativeLibrary.updateFramebuffer(NativeLibrary.isPortraitMode)
                         }
                     } else if (button.id == NativeLibrary.ButtonType.BUTTON_TURBO && button.status == NativeLibrary.ButtonState.PRESSED) {
                         TurboHelper.toggleTurbo(true)

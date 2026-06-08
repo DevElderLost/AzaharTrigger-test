@@ -52,14 +52,16 @@ class ScreenAdjustmentUtil(
         val isNowShowing = !EmulationMenuSettings.showSecondaryScreen
         EmulationMenuSettings.showSecondaryScreen = isNowShowing
 
-        // Hanya berlaku saat SINGLE_SCREEN aktif
-        val isSingleScreen = if (NativeLibrary.isPortraitMode) {
-            IntSetting.PORTRAIT_SCREEN_LAYOUT.int == ScreenLayout.SINGLE_SCREEN.int
+        // Berlaku saat SINGLE_SCREEN atau SINGLE_WITH_OVERLAY aktif
+        val currentLayout = if (NativeLibrary.isPortraitMode) {
+            IntSetting.PORTRAIT_SCREEN_LAYOUT.int
         } else {
-            IntSetting.SCREEN_LAYOUT.int == ScreenLayout.SINGLE_SCREEN.int
+            IntSetting.SCREEN_LAYOUT.int
         }
+        val isRelevantMode = currentLayout == ScreenLayout.SINGLE_SCREEN.int ||
+                             currentLayout == ScreenLayout.SINGLE_WITH_OVERLAY.int
 
-        if (!isSingleScreen) return
+        if (!isRelevantMode) return
 
         if (isNowShowing) {
             // Terapkan CUSTOM_LAYOUT sementara supaya layar kedua
