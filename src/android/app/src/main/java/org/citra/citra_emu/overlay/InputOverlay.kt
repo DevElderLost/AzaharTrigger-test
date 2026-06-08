@@ -112,8 +112,6 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
         }
         return true
     }
-        return true
-    }
 
     override fun onTouch(v: View, event: MotionEvent): Boolean {
         if (isInEditMode) {
