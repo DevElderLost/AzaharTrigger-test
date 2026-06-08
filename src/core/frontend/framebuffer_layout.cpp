@@ -148,6 +148,62 @@ FramebufferLayout SingleFrameLayout(u32 width, u32 height, bool swapped, bool up
     }
 }
 
+FramebufferLayout SingleWithOverlayFrameLayout(u32 width, u32 height, bool is_swapped,
+                                               bool upright) {
+    ASSERT(width > 0);
+    ASSERT(height > 0);
+    if (upright) {
+        std::swap(width, height);
+    }
+
+    // Top screen fullscreen - sama dengan SingleFrameLayout
+    FramebufferLayout res{width, height, !is_swapped, is_swapped, {}, {}, !upright};
+
+    Common::Rectangle<u32> screen_window_area{0, 0, width, height};
+    Common::Rectangle<u32> top_screen{0, 0, Core::kScreenTopWidth, Core::kScreenTopHeight};
+
+    const float window_aspect_ratio = static_cast<float>(height) / static_cast<float>(width);
+    const auto aspect_ratio_setting = Settings::values.aspect_ratio.GetValue();
+
+    switch (aspect_ratio_setting) {
+    case Settings::AspectRatio::Default:
+        top_screen = MaxRectangle(screen_window_area, top_screen,
+                                  Settings::values.use_integer_scaling.GetValue());
+        break;
+    case Settings::AspectRatio::Stretch:
+        top_screen = MaxRectangle(screen_window_area, window_aspect_ratio);
+        break;
+    default:
+        float emulation_aspect_ratio =
+            FramebufferLayout::GetAspectRatioValue(aspect_ratio_setting);
+        top_screen = MaxRectangle(screen_window_area, emulation_aspect_ratio);
+    }
+
+    top_screen = top_screen.TranslateX((width - top_screen.GetWidth()) / 2)
+                     .TranslateY((height - top_screen.GetHeight()) / 2);
+    res.top_screen = top_screen;
+
+    // Bottom screen: posisi dari custom layout settings, di-scale ke window size
+    const float scale_x = static_cast<float>(width) / Core::kScreenTopWidth;
+    const float scale_y = static_cast<float>(height) / Core::kScreenTopHeight;
+
+    u32 bot_x = static_cast<u32>(Settings::values.custom_bottom_x.GetValue() * scale_x);
+    u32 bot_y = static_cast<u32>(Settings::values.custom_bottom_y.GetValue() * scale_y);
+    u32 bot_w = static_cast<u32>(Settings::values.custom_bottom_width.GetValue() * scale_x);
+    u32 bot_h = static_cast<u32>(Settings::values.custom_bottom_height.GetValue() * scale_y);
+
+    // Clamp ke batas window
+    if (bot_x + bot_w > width)  bot_w = width > bot_x ? width - bot_x : 0;
+    if (bot_y + bot_h > height) bot_h = height > bot_y ? height - bot_y : 0;
+
+    res.bottom_screen = {bot_x, bot_y, bot_x + bot_w, bot_y + bot_h};
+
+    if (upright) {
+        return reverseLayout(res);
+    }
+    return res;
+}
+
 FramebufferLayout LargeFrameLayout(u32 width, u32 height, bool swapped, bool upright,
                                    float scale_factor,
                                    Settings::SmallScreenPosition small_screen_position) {
