@@ -179,8 +179,8 @@ EOF
         EmulationLifecycleUtil.removeHook(onShutdown)
         NativeLibrary.playTimeManagerStop()
         // [PATCH-KT2] Hancurkan semua resource multiplayer sebelum Activity mati.
-        // Ini memastikan ENetHost, loop thread, dan AnnounceMultiplayerSession
-        // tidak bocor ketika user keluar dari emulasi atau ganti game.
+        // Aman dipanggil bahkan jika multiplayer belum pernah diinisialisasi —
+        // native side sudah punya guard null check yang mencegah crash.
         NativeLibrary.shutdownMultiplayer()
         isEmulationRunning = false
         instance = null
