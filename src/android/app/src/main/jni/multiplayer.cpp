@@ -33,7 +33,10 @@ void AndroidMultiplayer::UnbindCallbacks() {
         if (cb_chat)   { member->Unbind(cb_chat);   cb_chat   = nullptr; }
     } else {
         // RoomMember sudah destroyed, cukup clear handle
-        cb_state = cb_error = cb_status = cb_chat = nullptr;
+        cb_state  = nullptr;
+        cb_error  = nullptr;
+        cb_status  = nullptr;
+        cb_chat  = nullptr;
     }
 }
 
