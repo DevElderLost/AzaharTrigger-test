@@ -744,14 +744,6 @@ object NativeLibrary {
 
     external fun initMultiplayer()
 
-    /**
-     * [PATCH-KT1] Menghancurkan semua resource multiplayer:
-     * ENetHost, loop thread, dan AnnounceMultiplayerSession.
-     * Wajib dipanggil saat emulasi berhenti untuk mencegah memory leak.
-     * Pasangan dari initMultiplayer() — dipanggil di onDestroy & onNewIntent.
-     */
-    external fun shutdownMultiplayer()
-
     @Keep
     @JvmStatic
     fun createFile(directory: String, filename: String): Boolean =

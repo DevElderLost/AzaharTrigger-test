@@ -18,13 +18,6 @@ AndroidMultiplayer::AndroidMultiplayer(Core::System& system_,
     : system{system_}, announce_multiplayer_session(session), melon_lan_adapter(nullptr) {}
 
 AndroidMultiplayer::~AndroidMultiplayer() {
-    // [PATCH2] Unbind semua callback agar tidak ada dangling reference
-    if (auto member = Network::GetRoomMember().lock()) {
-        if (cb_state_handle)  member->Unbind(cb_state_handle);
-        if (cb_error_handle)  member->Unbind(cb_error_handle);
-        if (cb_status_handle) member->Unbind(cb_status_handle);
-        if (cb_chat_handle)   member->Unbind(cb_chat_handle);
-    }
     if (melon_lan_adapter) {
         melon_lan_adapter->Shutdown();
     }
@@ -53,9 +46,8 @@ bool AndroidMultiplayer::NetworkInit() {
     }
 
     if (auto member = Network::GetRoomMember().lock()) {
-        // [PATCH2] Simpan handle dari setiap Bind agar bisa di-Unbind saat destructor.
-        // Tanpa ini, setiap NetworkInit() menambah callback baru tanpa bisa dihapus.
-        cb_state_handle = member->BindOnStateChanged([this](const Network::RoomMember::State& state) {
+        // register the network structs to use in slots and signals
+        member->BindOnStateChanged([this](const Network::RoomMember::State& state) {
             if (state == Network::RoomMember::State::Joined ||
                 state == Network::RoomMember::State::Moderator) {
                 NetPlayStatus status;
@@ -73,7 +65,7 @@ bool AndroidMultiplayer::NetworkInit() {
                 AddNetPlayMessage(static_cast<int>(status), msg);
             }
         });
-        cb_error_handle = member->BindOnError([this](const Network::RoomMember::Error& error) {
+        member->BindOnError([this](const Network::RoomMember::Error& error) {
             NetPlayStatus status;
             std::string msg;
             switch (error) {
@@ -119,7 +111,7 @@ bool AndroidMultiplayer::NetworkInit() {
             }
             AddNetPlayMessage(static_cast<int>(status), msg);
         });
-        cb_status_handle = member->BindOnStatusMessageReceived(
+        member->BindOnStatusMessageReceived(
             [this](const Network::StatusMessageEntry& status_message) {
                 NetPlayStatus status = NetPlayStatus::NO_ERROR;
                 std::string msg(status_message.nickname);
@@ -142,7 +134,7 @@ bool AndroidMultiplayer::NetworkInit() {
                 }
                 AddNetPlayMessage(static_cast<int>(status), msg);
             });
-        cb_chat_handle = member->BindOnChatMessageRecieved([this](const Network::ChatEntry& chat) {
+        member->BindOnChatMessageRecieved([this](const Network::ChatEntry& chat) {
             NetPlayStatus status = NetPlayStatus::CHAT_MESSAGE;
             std::string msg(chat.nickname);
             msg += ": ";
@@ -228,22 +220,18 @@ NetPlayStatus AndroidMultiplayer::NetPlayJoinRoom(const std::string& ipaddress, 
     constexpr int JOIN_WAIT_STEP_MS = 100;
     for (int elapsed = 0; elapsed < JOIN_WAIT_TIMEOUT_MS; elapsed += JOIN_WAIT_STEP_MS) {
         std::this_thread::sleep_for(std::chrono::milliseconds(JOIN_WAIT_STEP_MS));
-
+        
         if (member->GetState() == Network::RoomMember::State::Joined ||
             member->GetState() == Network::RoomMember::State::Moderator) {
             return NetPlayStatus::NO_ERROR;
         }
     }
 
-    // [PATCH7] Jika timeout, bersihkan state member agar percobaan join
-    // berikutnya tidak kena false ALREADY_IN_ROOM. Sebelumnya loop_thread
-    // dibiarkan berjalan dalam state Joining tanpa dibersihkan.
-    // PATCH7_JOIN_CLEANUP
-    if (member->GetState() == Network::RoomMember::State::Joining) {
-        member->Leave(); // Hentikan loop_thread dan hancurkan ENetHost
+    if (!member->IsConnected()) {
+        return NetPlayStatus::COULD_NOT_CONNECT;
     }
 
-    return NetPlayStatus::COULD_NOT_CONNECT;
+    return NetPlayStatus::WRONG_PASSWORD;
 }
 
 void AndroidMultiplayer::NetPlaySendMessage(const std::string& msg) {

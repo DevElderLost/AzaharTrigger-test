@@ -118,11 +118,4 @@ private:
     static std::unique_ptr<Network::VerifyUser::Backend> CreateVerifyBackend(bool use_validation);
     std::weak_ptr<Network::AnnounceMultiplayerSession> announce_multiplayer_session;
     std::unique_ptr<Network::MelonLANAdapter> melon_lan_adapter;
-
-    // [PATCH2] Handles untuk callback agar bisa di-Unbind saat shutdown,
-    // mencegah akumulasi callback dan dangling lambda captures.
-    Network::RoomMember::CallbackHandle<Network::RoomMember::State>         cb_state_handle;
-    Network::RoomMember::CallbackHandle<Network::RoomMember::Error>         cb_error_handle;
-    Network::RoomMember::CallbackHandle<Network::StatusMessageEntry>        cb_status_handle;
-    Network::RoomMember::CallbackHandle<Network::ChatEntry>                 cb_chat_handle;
 };

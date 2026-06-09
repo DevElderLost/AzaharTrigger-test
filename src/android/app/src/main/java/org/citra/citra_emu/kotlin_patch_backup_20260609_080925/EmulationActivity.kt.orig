@@ -151,10 +151,6 @@ class EmulationActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        // [PATCH-KT3] Shutdown multiplayer SEBELUM stopEmulation saat ganti game.
-        // Tanpa ini, koneksi multiplayer sebelumnya masih hidup (ghost connection)
-        // dan percobaan join berikutnya mendapat ALREADY_IN_ROOM palsu.
-        NativeLibrary.shutdownMultiplayer()
         NativeLibrary.stopEmulation()
         NativeLibrary.playTimeManagerStop()
 
@@ -226,10 +222,6 @@ class EmulationActivity : AppCompatActivity() {
     override fun onDestroy() {
         EmulationLifecycleUtil.removeHook(onShutdown)
         NativeLibrary.playTimeManagerStop()
-        // [PATCH-KT2] Hancurkan semua resource multiplayer sebelum Activity mati.
-        // Ini memastikan ENetHost, loop thread, dan AnnounceMultiplayerSession
-        // tidak bocor ketika user keluar dari emulasi atau ganti game.
-        NativeLibrary.shutdownMultiplayer()
         isEmulationRunning = false
         instance = null
         secondaryDisplay.releasePresentation()

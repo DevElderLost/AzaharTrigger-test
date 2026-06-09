@@ -819,10 +819,6 @@ void Room::RoomImpl::SendStatusMessage(StatusMessageTypes type, const std::strin
 }
 
 void Room::RoomImpl::BroadcastRoomInformation() {
-    // [PATCH5] members.size() dan iterasi members harus dalam satu lock yang sama.
-    // Sebelumnya size() dibaca di luar lock, sehingga member bisa join/disconnect
-    // antara pembacaan size dan lock, menghasilkan packet yang corrupt (ukuran
-    // tidak cocok dengan data) yang menyebabkan client disconnect.
     Packet packet;
     packet << static_cast<u8>(IdRoomInformation);
     packet << room_information.name;
@@ -832,9 +828,9 @@ void Room::RoomImpl::BroadcastRoomInformation() {
     packet << room_information.preferred_game;
     packet << room_information.host_username;
 
+    packet << static_cast<u32>(members.size());
     {
-        std::lock_guard lock(member_mutex); // PATCH5_BROADCAST_FIXED
-        packet << static_cast<u32>(members.size());
+        std::lock_guard lock(member_mutex);
         for (const auto& member : members) {
             packet << member.nickname;
             packet << member.mac_address;
@@ -996,10 +992,7 @@ void Room::RoomImpl::HandleGameNamePacket(const ENetEvent* event) {
 }
 
 void Room::RoomImpl::HandleClientDisconnection(ENetPeer* client) {
-    // [PATCH6] Fungsi ini dipanggil dari handler ENET_EVENT_TYPE_DISCONNECT,
-    // artinya peer SUDAH terputus. Memanggil enet_peer_disconnect() lagi
-    // adalah undefined behavior di ENet dan bisa menyebabkan crash/state corrupt.
-    // PATCH6_NO_DOUBLE_DISCONNECT
+    // Remove the client from the members list.
     std::string nickname, username, ip;
     {
         std::lock_guard lock(member_mutex);
@@ -1018,7 +1011,8 @@ void Room::RoomImpl::HandleClientDisconnection(ENetPeer* client) {
         }
     }
 
-    // Peer sudah disconnect — tidak perlu panggil enet_peer_disconnect() lagi.
+    // Announce the change to all clients.
+    enet_peer_disconnect(client, 0);
     if (!nickname.empty())
         SendStatusMessage(IdMemberLeave, nickname, username, ip);
     BroadcastRoomInformation();

@@ -155,142 +155,119 @@ bool RoomMember::RoomMemberImpl::IsConnected() const {
     return state == State::Joining || state == State::Joined || state == State::Moderator;
 }
 
-// [PATCH3] Konstanta batas antrian kirim paket.
-// Mencegah send_list membengkak saat device lag, yang sebelumnya
-// menyebabkan memory spike → OOM → disconnect paksa.
-static constexpr size_t MAX_SEND_QUEUE = 64;
-
 void RoomMember::RoomMemberImpl::MemberLoop() {
-    // [PATCH3] Receive dan send dipisah lock-nya sehingga network_mutex
-    // tidak dipegang sepanjang iterasi. Sebelumnya satu lock_guard mencakup
-    // enet_host_service + semua handler + enet_host_flush, yang menyebabkan
-    // disconnect saat device lag karena ENet internal timeout terpicu.
+    // Receive packets while the connection is open
     while (IsConnected()) {
-        // --- Tahap 1: Terima semua paket masuk (non-blocking, timeout=0) ---
-        {
-            std::lock_guard network_lock(network_mutex);
-            ENetEvent event;
-            while (enet_host_service(client, &event, 0) > 0) {
-                switch (event.type) {
-                case ENET_EVENT_TYPE_RECEIVE:
-                    switch (event.packet->data[0]) {
-                    case IdWifiPacket:
-                        HandleWifiPackets(&event);
-                        break;
-                    case IdChatMessage:
-                        HandleChatPacket(&event);
-                        break;
-                    case IdStatusMessage:
-                        HandleStatusMessagePacket(&event);
-                        break;
-                    case IdRoomInformation:
-                        HandleRoomInformationPacket(&event);
-                        break;
-                    case IdJoinSuccess:
-                    case IdJoinSuccessAsMod:
-                        // The join request was successful, we are now in the room.
-                        // Note: member_information may not be populated yet due to packet arrival
-                        // order. IdRoomInformation may arrive after IdJoinSuccess for LAN rooms.
-                        // This is not a fatal condition, so we just log it and continue.
-                        if (member_information.size() == 0) {
-                            LOG_WARNING(Network, "Received join success but room information not yet available. "
-                                       "This is normal for LAN rooms with packet reordering.");
-                        }
-                        HandleJoinPacket(&event); // Get the MAC Address for the client
-                        if (event.packet->data[0] == IdJoinSuccessAsMod) {
-                            SetState(State::Moderator);
-                        } else {
-                            SetState(State::Joined);
-                        }
-                        break;
-                    case IdModBanListResponse:
-                        HandleModBanListResponsePacket(&event);
-                        break;
-                    case IdRoomIsFull:
-                        SetState(State::Idle);
-                        SetError(Error::RoomIsFull);
-                        break;
-                    case IdNameCollision:
-                        SetState(State::Idle);
-                        SetError(Error::NameCollision);
-                        break;
-                    case IdMacCollision:
-                        SetState(State::Idle);
-                        SetError(Error::MacCollision);
-                        break;
-                    case IdConsoleIdCollision:
-                        SetState(State::Idle);
-                        SetError(Error::ConsoleIdCollision);
-                        break;
-                    case IdVersionMismatch:
-                        SetState(State::Idle);
-                        SetError(Error::WrongVersion);
-                        break;
-                    case IdWrongPassword:
-                        SetState(State::Idle);
-                        SetError(Error::WrongPassword);
-                        break;
-                    case IdCloseRoom:
-                        SetState(State::Idle);
-                        SetError(Error::LostConnection);
-                        break;
-                    case IdHostKicked:
-                        SetState(State::Idle);
-                        SetError(Error::HostKicked);
-                        break;
-                    case IdHostBanned:
-                        SetState(State::Idle);
-                        SetError(Error::HostBanned);
-                        break;
-                    case IdModPermissionDenied:
-                        SetError(Error::PermissionDenied);
-                        break;
-                    case IdModNoSuchUser:
-                        SetError(Error::NoSuchUser);
-                        break;
-                    }
-                    enet_packet_destroy(event.packet);
+        std::lock_guard network_lock(network_mutex);
+        ENetEvent event;
+        if (enet_host_service(client, &event, 16) > 0) {
+            switch (event.type) {
+            case ENET_EVENT_TYPE_RECEIVE:
+                switch (event.packet->data[0]) {
+                case IdWifiPacket:
+                    HandleWifiPackets(&event);
                     break;
-                case ENET_EVENT_TYPE_DISCONNECT:
-                    if (state == State::Joined || state == State::Moderator) {
-                        SetState(State::Idle);
-                        SetError(Error::LostConnection);
+                case IdChatMessage:
+                    HandleChatPacket(&event);
+                    break;
+                case IdStatusMessage:
+                    HandleStatusMessagePacket(&event);
+                    break;
+                case IdRoomInformation:
+                    HandleRoomInformationPacket(&event);
+                    break;
+                case IdJoinSuccess:
+                case IdJoinSuccessAsMod:
+                    // The join request was successful, we are now in the room.
+                    // Note: member_information may not be populated yet due to packet arrival
+                    // order. IdRoomInformation may arrive after IdJoinSuccess for LAN rooms.
+                    // This is not a fatal condition, so we just log it and continue.
+                    if (member_information.size() == 0) {
+                        LOG_WARNING(Network, "Received join success but room information not yet available. "
+                                   "This is normal for LAN rooms with packet reordering.");
+                    }           
+                    HandleJoinPacket(&event); // Get the MAC Address for the client
+                    if (event.packet->data[0] == IdJoinSuccessAsMod) {
+                        SetState(State::Moderator);
+                    } else {
+                        SetState(State::Joined);
                     }
                     break;
-                case ENET_EVENT_TYPE_NONE:
+                case IdModBanListResponse:
+                    HandleModBanListResponsePacket(&event);
                     break;
-                case ENET_EVENT_TYPE_CONNECT:
-                    // The ENET_EVENT_TYPE_CONNECT event can not possibly happen here because we're
-                    // already connected
-                    ASSERT_MSG(false, "Received unexpected connect event while already connected");
+                case IdRoomIsFull:
+                    SetState(State::Idle);
+                    SetError(Error::RoomIsFull);
+                    break;
+                case IdNameCollision:
+                    SetState(State::Idle);
+                    SetError(Error::NameCollision);
+                    break;
+                case IdMacCollision:
+                    SetState(State::Idle);
+                    SetError(Error::MacCollision);
+                    break;
+                case IdConsoleIdCollision:
+                    SetState(State::Idle);
+                    SetError(Error::ConsoleIdCollision);
+                    break;
+                case IdVersionMismatch:
+                    SetState(State::Idle);
+                    SetError(Error::WrongVersion);
+                    break;
+                case IdWrongPassword:
+                    SetState(State::Idle);
+                    SetError(Error::WrongPassword);
+                    break;
+                case IdCloseRoom:
+                    SetState(State::Idle);
+                    SetError(Error::LostConnection);
+                    break;
+                case IdHostKicked:
+                    SetState(State::Idle);
+                    SetError(Error::HostKicked);
+                    break;
+                case IdHostBanned:
+                    SetState(State::Idle);
+                    SetError(Error::HostBanned);
+                    break;
+                case IdModPermissionDenied:
+                    SetError(Error::PermissionDenied);
+                    break;
+                case IdModNoSuchUser:
+                    SetError(Error::NoSuchUser);
                     break;
                 }
+                enet_packet_destroy(event.packet);
+                break;
+            case ENET_EVENT_TYPE_DISCONNECT:
+                if (state == State::Joined || state == State::Moderator) {
+                    SetState(State::Idle);
+                    SetError(Error::LostConnection);
+                }
+                break;
+            case ENET_EVENT_TYPE_NONE:
+                break;
+            case ENET_EVENT_TYPE_CONNECT:
+                // The ENET_EVENT_TYPE_CONNECT event can not possibly happen here because we're
+                // already connected
+                ASSERT_MSG(false, "Received unexpected connect event while already connected");
+                break;
             }
         }
 
-        // --- Tahap 2: Kirim paket yang antri (lock terpisah) ---
-        // [PATCH4] send_list sudah dibatasi MAX_SEND_QUEUE di Send(),
-        // sehingga tidak ada burst traffic stale saat recover dari lag.
+        std::list<Packet> packets;
         {
-            std::list<Packet> packets;
-            {
-                std::lock_guard send_list_lock(send_list_mutex);
-                packets.swap(send_list);
-            }
-            if (!packets.empty()) {
-                std::lock_guard network_lock(network_mutex);
-                for (const auto& packet : packets) {
-                    ENetPacket* enetPacket = enet_packet_create(packet.GetData(),
-                                                                packet.GetDataSize(),
-                                                                ENET_PACKET_FLAG_RELIABLE);
-                    enet_peer_send(server, 0, enetPacket);
-                }
-                enet_host_flush(client);
-            }
+            std::lock_guard send_list_lock(send_list_mutex);
+            packets.swap(send_list);
         }
-
-        // Sleep pendek agar tidak busy-spin saat tidak ada paket
-        std::this_thread::sleep_for(std::chrono::milliseconds(8));
+        for (const auto& packet : packets) {
+            ENetPacket* enetPacket = enet_packet_create(packet.GetData(), packet.GetDataSize(),
+                                                        ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_send(server, 0, enetPacket);
+        }
+        enet_host_flush(client);
     }
     Disconnect();
 };
@@ -301,12 +278,6 @@ void RoomMember::RoomMemberImpl::StartLoop() {
 
 void RoomMember::RoomMemberImpl::Send(Packet&& packet) {
     std::lock_guard lock(send_list_mutex);
-    // [PATCH4] Buang paket paling lama jika antrian sudah penuh.
-    // Paket WiFi game yang terlalu lama antri sudah tidak relevan (stale),
-    // mengirimnya semua sekaligus hanya membuat burst traffic → disconnect.
-    while (send_list.size() >= MAX_SEND_QUEUE) {
-        send_list.pop_front();
-    }
     send_list.push_back(std::move(packet));
 }
 

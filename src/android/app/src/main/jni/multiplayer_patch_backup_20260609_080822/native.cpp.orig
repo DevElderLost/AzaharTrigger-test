@@ -1043,20 +1043,6 @@ Java_org_citra_citra_1emu_NativeLibrary_initMultiplayer(JNIEnv* env, [[maybe_unu
     multiplayer->NetworkInit();
 }
 
-// [PATCH1] Shutdown multiplayer — hancurkan semua resource jaringan.
-// Wajib dipanggil dari Kotlin sebelum/setelah emulasi berhenti untuk
-// mencegah memory leak pada ENetHost, thread loop, dan AnnounceSession.
-JNIEXPORT void JNICALL
-Java_org_citra_citra_1emu_NativeLibrary_shutdownMultiplayer(
-    [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jobject obj) {
-    if (multiplayer) {
-        multiplayer->NetPlayLeaveRoom();
-        AndroidMultiplayer::NetworkShutdown();
-        multiplayer.reset();
-        announce_multiplayer_session.reset();
-    }
-}
-
 JNIEXPORT jobjectArray JNICALL Java_org_citra_citra_1emu_utils_NetPlayManager_netPlayGetPublicRooms(
     JNIEnv* env, [[maybe_unused]] jobject obj) {
     return ToJStringArray(env, multiplayer->NetPlayGetPublicRooms());
