@@ -52,17 +52,26 @@ FILE_NATIVE_KT=$(find_file "NativeLibrary.kt" \
     exit 1
 }
 
-FILE_EMULATION_KT=$(find_file "EmulationActivity.kt" \
-    "class EmulationActivity : AppCompatActivity" \
-    "EmulationActivity.kt") || {
-    error "EmulationActivity.kt tidak ditemukan."
+# EmulationActivity.kt yang benar ada di folder activities/
+# package: org.citra.citra_emu.activities
+# Signature unik: "fun onEmulationStarted" + package activities
+FILE_EMULATION_KT=$(grep -rl "package org.citra.citra_emu.activities" "$SEARCH_ROOT" 2>/dev/null \
+    | grep -E "(^|/)EmulationActivity\.kt$" | head -1)
+if [ -z "$FILE_EMULATION_KT" ]; then
+    error "EmulationActivity.kt (package activities) tidak ditemukan."
     exit 1
-}
+fi
 
 echo ""
 success "File ditemukan:"
-echo "  NativeLibrary.kt    → $FILE_NATIVE_KT"
-echo "  EmulationActivity.kt → $FILE_EMULATION_KT"
+echo "  NativeLibrary.kt          → $FILE_NATIVE_KT"
+echo "  EmulationActivity.kt      → $FILE_EMULATION_KT"
+# Validasi package name sesuai
+if ! grep -q "package org.citra.citra_emu.activities" "$FILE_EMULATION_KT" 2>/dev/null; then
+    error "File ditemukan tapi package name tidak sesuai: $FILE_EMULATION_KT"
+    exit 1
+fi
+success "Package name EmulationActivity terverifikasi: org.citra.citra_emu.activities ✓"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FASE 1 — CEK IDEMPOTEN (sudah diterapkan sebelumnya?)
