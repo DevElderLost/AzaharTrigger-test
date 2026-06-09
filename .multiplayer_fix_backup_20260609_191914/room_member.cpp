@@ -276,23 +276,8 @@ void RoomMember::RoomMemberImpl::StartLoop() {
     loop_thread = std::make_unique<std::thread>(&RoomMember::RoomMemberImpl::MemberLoop, this);
 }
 
-// FIX [7]: Batas maksimum packet di send_list.
-// Skenario: Android lag/low-memory → emulator melambat → MemberLoop jarang jalan
-// → send_list terakumulasi (unbounded) → burst besar saat akhirnya diproses
-// → server-side ENet timeout → server disconnect client → LostConnection.
-// Dengan batas ini, packet lama di-drop (WiFi packet lama tidak relevan lagi),
-// lebih baik dari OOM atau disconnect total.
-constexpr std::size_t MaxSendListSize = 64;
-
 void RoomMember::RoomMemberImpl::Send(Packet&& packet) {
     std::lock_guard lock(send_list_mutex);
-    if (send_list.size() >= MaxSendListSize) {
-        // Drop packet TERTUA (head), bukan yang baru — packet terbaru lebih relevan
-        LOG_WARNING(Network,
-            "send_list overflow ({} packets), drop packet tertua untuk cegah memory bloat",
-            send_list.size());
-        send_list.pop_front();
-    }
     send_list.push_back(std::move(packet));
 }
 
@@ -440,28 +425,13 @@ void RoomMember::RoomMemberImpl::Disconnect() {
 
     if (!server)
         return;
-
-    // FIX [4]: Jika peer sudah disconnect dari sisi remote (ENET_PEER_STATE_DISCONNECTED
-    // atau ZOMBIE), JANGAN panggil enet_peer_disconnect() lagi. Tanpa fix ini,
-    // enet_host_service akan menunggu hingga ConnectionTimeoutMs (5000ms) sia-sia,
-    // yang terasa sebagai LAG/freeze ~5 detik setiap kali koneksi terputus tiba-tiba.
-    if (server->state == ENET_PEER_STATE_DISCONNECTED ||
-        server->state == ENET_PEER_STATE_ZOMBIE) {
-        enet_peer_reset(server);
-        server = nullptr;
-        return;
-    }
-
     enet_peer_disconnect(server, 0);
 
-    // Gunakan timeout lebih pendek (1000ms) — cukup untuk graceful disconnect
-    // tanpa menyebabkan freeze panjang jika server tidak merespons
-    constexpr u32 GracefulDisconnectTimeoutMs = 1000;
     ENetEvent event;
-    while (enet_host_service(client, &event, GracefulDisconnectTimeoutMs) > 0) {
+    while (enet_host_service(client, &event, ConnectionTimeoutMs) > 0) {
         switch (event.type) {
         case ENET_EVENT_TYPE_RECEIVE:
-            enet_packet_destroy(event.packet); // Buang semua incoming data
+            enet_packet_destroy(event.packet); // Ignore all incoming data
             break;
         case ENET_EVENT_TYPE_DISCONNECT:
             server = nullptr;
@@ -471,7 +441,7 @@ void RoomMember::RoomMemberImpl::Disconnect() {
             break;
         }
     }
-    // Graceful disconnect tidak berhasil, force reset
+    // didn't disconnect gracefully force disconnect
     enet_peer_reset(server);
     server = nullptr;
 }
@@ -713,30 +683,12 @@ void RoomMember::Unbind(CallbackHandle<T> handle) {
 }
 
 void RoomMember::Leave() {
-    // Set Idle agar MemberLoop bisa exit dengan benar
     room_member_impl->SetState(State::Idle);
-
-    // FIX [3]: Cek joinable() sebelum join().
-    // Jika koneksi putus dari sisi server, MemberLoop bisa selesai sendiri
-    // sebelum Leave() dipanggil dari Java. Memanggil join() pada thread yang
-    // sudah selesai (joinable=false) adalah undefined behavior.
-    if (room_member_impl->loop_thread && room_member_impl->loop_thread->joinable()) {
-        room_member_impl->loop_thread->join();
-    }
+    room_member_impl->loop_thread->join();
     room_member_impl->loop_thread.reset();
 
-    // FIX [2]: Bersihkan send_list agar tidak ada packet yang bocor di heap.
-    // Bisa terjadi burst packets sesaat sebelum disconnect yang tidak sempat terkirim.
-    {
-        std::lock_guard<std::mutex> lock(room_member_impl->send_list_mutex);
-        room_member_impl->send_list.clear();
-    }
-
-    // Guard: client bisa nullptr jika Join() gagal di tengah jalan
-    if (room_member_impl->client) {
-        enet_host_destroy(room_member_impl->client);
-        room_member_impl->client = nullptr;
-    }
+    enet_host_destroy(room_member_impl->client);
+    room_member_impl->client = nullptr;
 }
 
 template void RoomMember::Unbind(CallbackHandle<WifiPacket>);

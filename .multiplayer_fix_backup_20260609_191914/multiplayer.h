@@ -3,7 +3,6 @@
 // Refer to the license.txt file included.
 
 #pragma once
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -100,9 +99,6 @@ public:
 
     std::vector<std::string> NetPlayGetPublicRooms();
 
-    // Unbind semua callbacks (panggil sebelum destroy)
-    void UnbindCallbacks();
-
     // melonDS LAN compatibility methods
     bool MelonLANInit();
     void MelonLANShutdown();
@@ -122,11 +118,4 @@ private:
     static std::unique_ptr<Network::VerifyUser::Backend> CreateVerifyBackend(bool use_validation);
     std::weak_ptr<Network::AnnounceMultiplayerSession> announce_multiplayer_session;
     std::unique_ptr<Network::MelonLANAdapter> melon_lan_adapter;
-
-    // FIX [1+6]: Simpan callback handles agar bisa di-Unbind untuk cegah memory leak.
-    // Tanpa ini, lambda menyimpan `this` selamanya dan tidak bisa dibersihkan.
-    Network::RoomMember::CallbackHandle<Network::RoomMember::State>  cb_state;
-    Network::RoomMember::CallbackHandle<Network::RoomMember::Error>  cb_error;
-    Network::RoomMember::CallbackHandle<Network::StatusMessageEntry> cb_status;
-    Network::RoomMember::CallbackHandle<Network::ChatEntry>          cb_chat;
 };
