@@ -1145,12 +1145,13 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
         val editor = preferences.edit()
         // Indices 0-15  = tombol standar 3DS
         // Indices 16-20 = Combo Button 1-5
-        val enabledButtons = BooleanArray(21)
+        // Index  21     = Hide Secondary Screen
+        val enabledButtons = BooleanArray(22)
         enabledButtons.forEachIndexed { i: Int, _: Boolean ->
             var defaultValue = true
             when (i) {
-                // Disabled by default: turbo, swap, home, extra, combo buttons
-                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
+                // Disabled by default: turbo, swap, home, extra, combo, hide-second-screen
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 -> defaultValue = false
             }
             enabledButtons[i] = preferences.getBoolean("buttonToggle$i", defaultValue)
         }
@@ -1313,6 +1314,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
         resetScale("controlScale-" + NativeLibrary.ButtonType.STICK_C)
         resetScale("controlScale-" + NativeLibrary.ButtonType.BUTTON_HOME)
         resetScale("controlScale-" + NativeLibrary.ButtonType.BUTTON_SWAP)
+        resetScale("controlScale-" + NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN)
         binding.surfaceInputOverlay.refreshControls()
     }
 
@@ -1340,13 +1342,21 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
             .apply()
 
         val editor = preferences.edit()
-        for (i in 0 until 21) {
+        for (i in 0 until 22) {
             var defaultValue = true
             when (i) {
-                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 -> defaultValue = false
             }
             editor.putBoolean("buttonToggle$i", defaultValue)
         }
+        // Bersihkan juga state hide secondary screen saat reset
+        preferences.edit()
+            .putBoolean("secondaryScreenHidden", false)
+            .remove("backup_custom_bottom_x")
+            .remove("backup_custom_bottom_y")
+            .remove("backup_custom_bottom_width")
+            .remove("backup_custom_bottom_height")
+            .apply()
         editor.apply()
         // Reset combo button enabled states
         for (slot in 1..5) {

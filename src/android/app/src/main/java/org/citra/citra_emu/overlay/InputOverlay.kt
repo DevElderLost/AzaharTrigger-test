@@ -26,6 +26,9 @@ import org.citra.citra_emu.NativeLibrary
 import org.citra.citra_emu.R
 import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.utils.TurboHelper
+import org.citra.citra_emu.display.ScreenLayout
+import org.citra.citra_emu.features.settings.model.IntSetting
+import org.citra.citra_emu.features.settings.utils.SettingsFile
 import org.citra.citra_emu.overlay.ComboButtonManager
 import java.lang.NullPointerException
 import kotlin.math.min
@@ -86,6 +89,32 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             isEnabled,
             (context as Activity).windowManager.defaultDisplay.rotation
         )
+    }
+
+    private fun toggleHideSecondaryScreen() {
+        val isPortrait = NativeLibrary.isPortraitMode
+        val currentLayout = if (isPortrait) IntSetting.PORTRAIT_SCREEN_LAYOUT.int else IntSetting.SCREEN_LAYOUT.int
+        val customLayoutInt = if (isPortrait) org.citra.citra_emu.display.PortraitScreenLayout.CUSTOM_PORTRAIT_LAYOUT.int else ScreenLayout.CUSTOM_LAYOUT.int
+        if (currentLayout != customLayoutInt) return
+        val isHidden = preferences.getBoolean("secondaryScreenHidden", false)
+        if (!isHidden) {
+            if (isPortrait) {
+                preferences.edit().putInt("backup_bottom_x",IntSetting.PORTRAIT_BOTTOM_X.int).putInt("backup_bottom_y",IntSetting.PORTRAIT_BOTTOM_Y.int).putInt("backup_bottom_width",IntSetting.PORTRAIT_BOTTOM_WIDTH.int).putInt("backup_bottom_height",IntSetting.PORTRAIT_BOTTOM_HEIGHT.int).putBoolean("secondaryScreenHidden",true).apply()
+                IntSetting.PORTRAIT_BOTTOM_X.int=IntSetting.PORTRAIT_TOP_X.int; IntSetting.PORTRAIT_BOTTOM_Y.int=IntSetting.PORTRAIT_TOP_Y.int; IntSetting.PORTRAIT_BOTTOM_WIDTH.int=IntSetting.PORTRAIT_TOP_WIDTH.int; IntSetting.PORTRAIT_BOTTOM_HEIGHT.int=IntSetting.PORTRAIT_TOP_HEIGHT.int
+            } else {
+                preferences.edit().putInt("backup_bottom_x",IntSetting.LANDSCAPE_BOTTOM_X.int).putInt("backup_bottom_y",IntSetting.LANDSCAPE_BOTTOM_Y.int).putInt("backup_bottom_width",IntSetting.LANDSCAPE_BOTTOM_WIDTH.int).putInt("backup_bottom_height",IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int).putBoolean("secondaryScreenHidden",true).apply()
+                IntSetting.LANDSCAPE_BOTTOM_X.int=IntSetting.LANDSCAPE_TOP_X.int; IntSetting.LANDSCAPE_BOTTOM_Y.int=IntSetting.LANDSCAPE_TOP_Y.int; IntSetting.LANDSCAPE_BOTTOM_WIDTH.int=IntSetting.LANDSCAPE_TOP_WIDTH.int; IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int=IntSetting.LANDSCAPE_TOP_HEIGHT.int
+            }
+        } else {
+            if (isPortrait) {
+                IntSetting.PORTRAIT_BOTTOM_X.int=preferences.getInt("backup_bottom_x",IntSetting.PORTRAIT_BOTTOM_X.int); IntSetting.PORTRAIT_BOTTOM_Y.int=preferences.getInt("backup_bottom_y",IntSetting.PORTRAIT_BOTTOM_Y.int); IntSetting.PORTRAIT_BOTTOM_WIDTH.int=preferences.getInt("backup_bottom_width",IntSetting.PORTRAIT_BOTTOM_WIDTH.int); IntSetting.PORTRAIT_BOTTOM_HEIGHT.int=preferences.getInt("backup_bottom_height",IntSetting.PORTRAIT_BOTTOM_HEIGHT.int)
+            } else {
+                IntSetting.LANDSCAPE_BOTTOM_X.int=preferences.getInt("backup_bottom_x",IntSetting.LANDSCAPE_BOTTOM_X.int); IntSetting.LANDSCAPE_BOTTOM_Y.int=preferences.getInt("backup_bottom_y",IntSetting.LANDSCAPE_BOTTOM_Y.int); IntSetting.LANDSCAPE_BOTTOM_WIDTH.int=preferences.getInt("backup_bottom_width",IntSetting.LANDSCAPE_BOTTOM_WIDTH.int); IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int=preferences.getInt("backup_bottom_height",IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int)
+            }
+            preferences.edit().putBoolean("secondaryScreenHidden",false).remove("backup_bottom_x").remove("backup_bottom_y").remove("backup_bottom_width").remove("backup_bottom_height").apply()
+        }
+        NativeLibrary.reloadSettings()
+        NativeLibrary.updateFramebuffer(isPortrait)
     }
 
     fun hapticFeedback(type:Int){
@@ -174,6 +203,8 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                         swapScreen()
                     } else if (button.id == NativeLibrary.ButtonType.BUTTON_TURBO && button.status == NativeLibrary.ButtonState.PRESSED) {
                         TurboHelper.toggleTurbo(true)
+                    } else if (button.id == NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN && button.status == NativeLibrary.ButtonState.PRESSED) {
+                        toggleHideSecondaryScreen()
                     }
 
                     if (ComboButtonManager.isComboButton(button.id)) {
@@ -610,6 +641,19 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 )
             }
         }
+
+        // ── Hide Secondary Screen button (buttonToggle21) ──────────────────
+        if (preferences.getBoolean("buttonToggle21", false)) {
+            overlayButtons.add(
+                initializeOverlayButton(
+                    context,
+                    R.drawable.button_hide_second_screen,
+                    R.drawable.button_hide_second_screen_pressed,
+                    NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN,
+                    orientation
+                )
+            )
+        }
     }
 
     fun refreshControls() {
@@ -675,6 +719,20 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             "${ComboButtonManager.COMBO_BUTTON_1}-Portrait-X", -1f
         )
         if (combo1PositionPortrait == -1f) {
+            defaultOverlayPortrait()
+        }
+
+        // Init check: posisi Hide Secondary Screen button
+        val hideSecondScreenPos = preferences.getFloat(
+            "${NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN}-X", -1f
+        )
+        if (hideSecondScreenPos == -1f) {
+            defaultOverlayLandscape()
+        }
+        val hideSecondScreenPortraitPos = preferences.getFloat(
+            "${NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN}-Portrait-X", -1f
+        )
+        if (hideSecondScreenPortraitPos == -1f) {
             defaultOverlayPortrait()
         }
 
@@ -849,6 +907,9 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
             .putFloat("${ComboButtonManager.COMBO_BUTTON_4}-Y", 0.80f * maxY)
             .putFloat("${ComboButtonManager.COMBO_BUTTON_5}-X", 0.07f * maxX)
             .putFloat("${ComboButtonManager.COMBO_BUTTON_5}-Y", 0.80f * maxY)
+            // Hide Secondary Screen button — landscape default position
+            .putFloat("${NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN}-X", 0.18f * maxX)
+            .putFloat("${NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN}-Y", 0.80f * maxY)
             .apply()
     }
 
@@ -1000,6 +1061,24 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 NativeLibrary.ButtonType.BUTTON_TURBO.toString() + portrait + "-Y",
                 resources.getInteger(R.integer.N3DS_BUTTON_TURBO_PORTRAIT_Y).toFloat() / 1000 * maxY
             )
+            // Hide Secondary Screen button — portrait default position
+            .putFloat(
+                NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN.toString() + portrait + "-X",
+                0.10f * maxX
+            )
+            .putFloat(
+                NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN.toString() + portrait + "-Y",
+                0.75f * maxY
+            )
+            // Hide Secondary Screen button — portrait default position
+            .putFloat(
+                NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN.toString() + portrait + "-X",
+                0.10f * maxX
+            )
+            .putFloat(
+                NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN.toString() + portrait + "-Y",
+                0.75f * maxY
+            )
             // Combo Buttons default positions (portrait)
             .putFloat("${ComboButtonManager.COMBO_BUTTON_1}$portrait-X", 0.02f * maxX)
             .putFloat("${ComboButtonManager.COMBO_BUTTON_1}$portrait-Y", 0.75f * maxY)
@@ -1134,7 +1213,8 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
                 ComboButtonManager.COMBO_BUTTON_2,
                 ComboButtonManager.COMBO_BUTTON_3,
                 ComboButtonManager.COMBO_BUTTON_4,
-                ComboButtonManager.COMBO_BUTTON_5 -> 0.10f
+                ComboButtonManager.COMBO_BUTTON_5,
+                NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN -> 0.10f
 
                 else -> 0.11f
             }
