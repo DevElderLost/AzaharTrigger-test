@@ -18,8 +18,25 @@ AndroidMultiplayer::AndroidMultiplayer(Core::System& system_,
     : system{system_}, announce_multiplayer_session(session), melon_lan_adapter(nullptr) {}
 
 AndroidMultiplayer::~AndroidMultiplayer() {
+    // FIX [1+6]: Unbind semua callbacks sebelum destroy agar tidak ada dangling `this`
+    UnbindCallbacks();
     if (melon_lan_adapter) {
         melon_lan_adapter->Shutdown();
+    }
+}
+
+void AndroidMultiplayer::UnbindCallbacks() {
+    if (auto member = Network::GetRoomMember().lock()) {
+        if (cb_state)  { member->Unbind(cb_state);  cb_state  = nullptr; }
+        if (cb_error)  { member->Unbind(cb_error);  cb_error  = nullptr; }
+        if (cb_status) { member->Unbind(cb_status); cb_status = nullptr; }
+        if (cb_chat)   { member->Unbind(cb_chat);   cb_chat   = nullptr; }
+    } else {
+        // RoomMember sudah destroyed, cukup clear handle
+        cb_state  = nullptr;
+        cb_error  = nullptr;
+        cb_status  = nullptr;
+        cb_chat  = nullptr;
     }
 }
 
@@ -46,8 +63,11 @@ bool AndroidMultiplayer::NetworkInit() {
     }
 
     if (auto member = Network::GetRoomMember().lock()) {
+        // Bersihkan callback lama sebelum register baru (cegah double-bind)
+        UnbindCallbacks();
+
         // register the network structs to use in slots and signals
-        member->BindOnStateChanged([this](const Network::RoomMember::State& state) {
+        cb_state = member->BindOnStateChanged([this](const Network::RoomMember::State& state) {
             if (state == Network::RoomMember::State::Joined ||
                 state == Network::RoomMember::State::Moderator) {
                 NetPlayStatus status;
@@ -65,7 +85,7 @@ bool AndroidMultiplayer::NetworkInit() {
                 AddNetPlayMessage(static_cast<int>(status), msg);
             }
         });
-        member->BindOnError([this](const Network::RoomMember::Error& error) {
+        cb_error = member->BindOnError([this](const Network::RoomMember::Error& error) {
             NetPlayStatus status;
             std::string msg;
             switch (error) {
@@ -111,7 +131,7 @@ bool AndroidMultiplayer::NetworkInit() {
             }
             AddNetPlayMessage(static_cast<int>(status), msg);
         });
-        member->BindOnStatusMessageReceived(
+        cb_status = member->BindOnStatusMessageReceived(
             [this](const Network::StatusMessageEntry& status_message) {
                 NetPlayStatus status = NetPlayStatus::NO_ERROR;
                 std::string msg(status_message.nickname);
@@ -134,7 +154,7 @@ bool AndroidMultiplayer::NetworkInit() {
                 }
                 AddNetPlayMessage(static_cast<int>(status), msg);
             });
-        member->BindOnChatMessageRecieved([this](const Network::ChatEntry& chat) {
+        cb_chat = member->BindOnChatMessageRecieved([this](const Network::ChatEntry& chat) {
             NetPlayStatus status = NetPlayStatus::CHAT_MESSAGE;
             std::string msg(chat.nickname);
             msg += ": ";
@@ -192,7 +212,12 @@ NetPlayStatus AndroidMultiplayer::NetPlayCreateRoom(const std::string& ipaddress
         }
     }
 
-    // If join failed while room is created, clean up the room
+    // FIX [5]: Join timeout — member loop_thread sudah berjalan tapi join gagal.
+    // HARUS stop member thread dulu sebelum Destroy() room, jika tidak ada
+    // race condition antara member thread (masih sending) dan room yang di-destroy.
+    if (auto member_cleanup = Network::GetRoomMember().lock()) {
+        member_cleanup->Leave();
+    }
     room->Destroy();
     return NetPlayStatus::CREATE_ROOM_ERROR;
 }
@@ -212,12 +237,19 @@ NetPlayStatus AndroidMultiplayer::NetPlayJoinRoom(const std::string& ipaddress, 
     member->Join(username, Service::CFG::GetConsoleIdHash(system), ipaddress.c_str(), port, 0,
                  Network::NoPreferredMac, password);
 
-    // Wait a bit for the connection and join process to complete
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    if (member->GetState() == Network::RoomMember::State::Joined ||
-        member->GetState() == Network::RoomMember::State::Moderator) {
-        return NetPlayStatus::NO_ERROR;
+ 
+    // Wait for the connection and join process to complete.
+    // Use a longer timeout (5000ms = 5 seconds) to account for slower LAN networks.
+    // This matches the ConnectionTimeoutMs used in RoomMember::Join()
+    constexpr int JOIN_WAIT_TIMEOUT_MS = 5000;
+    constexpr int JOIN_WAIT_STEP_MS = 100;
+    for (int elapsed = 0; elapsed < JOIN_WAIT_TIMEOUT_MS; elapsed += JOIN_WAIT_STEP_MS) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(JOIN_WAIT_STEP_MS));
+        
+        if (member->GetState() == Network::RoomMember::State::Joined ||
+            member->GetState() == Network::RoomMember::State::Moderator) {
+            return NetPlayStatus::NO_ERROR;
+        }
     }
 
     if (!member->IsConnected()) {
@@ -305,15 +337,27 @@ bool AndroidMultiplayer::NetPlayIsHostedRoom() {
 }
 
 void AndroidMultiplayer::NetPlayLeaveRoom() {
+    // Hentikan MelonLAN session jika aktif (cegah thread leak di LAN mode)
+    if (melon_lan_adapter && melon_lan_adapter->IsActive()) {
+        melon_lan_adapter->EndSession();
+    }
+
     if (auto room = Network::GetRoom().lock()) {
-        // if you are in a room, leave it
+        // FIX [+]: Cek IsConnected() sebelum Leave() untuk mencegah Leave()
+        // dipanggil dua kali (sekali dari error callback, sekali dari Java).
+        // Double-Leave() menyebabkan join() pada thread yang sudah selesai → crash.
         if (auto member = Network::GetRoomMember().lock()) {
-            member->Leave();
+            if (member->IsConnected()) {
+                member->Leave();
+            } else if (member->GetState() == Network::RoomMember::State::Joining) {
+                // Jika masih di tengah join, tetap perlu cleanup thread
+                member->Leave();
+            }
         }
 
         ClearChat();
 
-        // if you are hosting a room, also stop hosting
+        // Hancurkan room jika kita yang hosting
         if (room->GetState() == Network::Room::State::Open) {
             room->Destroy();
         }

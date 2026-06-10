@@ -169,6 +169,22 @@ static void TryShutdown() {
         secondary_window.reset();
     }
 
+    // FIX [8]: Cleanup multiplayer sebelum shutdown.
+    // announce_multiplayer_session di-reset SETELAH multiplayer di-destroy
+    // agar weak_ptr di dalam AndroidMultiplayer tidak menjadi dangling.
+    if (multiplayer) {
+        if (multiplayer->NetPlayIsJoined() || multiplayer->NetPlayIsHostedRoom()) {
+            multiplayer->NetPlayLeaveRoom();
+        }
+        // Unbind semua callbacks sebelum destroy untuk cegah dangling `this`
+        multiplayer->UnbindCallbacks();
+        multiplayer.reset();
+    }
+    // Shutdown ENet layer setelah multiplayer object destroyed
+    AndroidMultiplayer::NetworkShutdown();
+    // Reset session shared_ptr — sekarang aman karena multiplayer sudah destroyed
+    announce_multiplayer_session.reset();
+
     InputManager::Shutdown();
     MicroProfileShutdown();
 }
@@ -1033,14 +1049,24 @@ void Java_org_citra_citra_1emu_NativeLibrary_removeAmiibo([[maybe_unused]] JNIEn
 JNIEXPORT void JNICALL
 Java_org_citra_citra_1emu_NativeLibrary_initMultiplayer(JNIEnv* env, [[maybe_unused]] jobject obj) {
     if (multiplayer) {
+        // Sudah diinit, jangan re-init: NetworkInit() mendaftarkan callbacks,
+        // double-register tanpa Unbind dulu = memory leak callbacks.
         return;
     }
 
-    announce_multiplayer_session = std::make_shared<Network::AnnounceMultiplayerSession>();
+    // FIX [8]: Pastikan ENet layer bersih sebelum init ulang
+    // (aman dipanggil meski belum pernah Init sebelumnya)
+    AndroidMultiplayer::NetworkShutdown();
 
+    announce_multiplayer_session = std::make_shared<Network::AnnounceMultiplayerSession>();
     multiplayer = std::make_unique<AndroidMultiplayer>(Core::System::GetInstance(),
                                                        announce_multiplayer_session);
-    multiplayer->NetworkInit();
+
+    if (!multiplayer->NetworkInit()) {
+        LOG_ERROR(Frontend, "initMultiplayer: NetworkInit() gagal, cleanup resources");
+        multiplayer.reset();
+        announce_multiplayer_session.reset();
+    }
 }
 
 JNIEXPORT jobjectArray JNICALL Java_org_citra_citra_1emu_utils_NetPlayManager_netPlayGetPublicRooms(
