@@ -872,6 +872,11 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
                     true
                 }
 
+                R.id.menu_emulation_adjust_scale_hide_second_screen -> {
+                    showAdjustScaleDialog("controlScale-" + NativeLibrary.ButtonType.BUTTON_HIDE_SECOND_SCREEN)
+                    true
+                }
+
                 R.id.menu_emulation_adjust_opacity -> {
                     showAdjustOpacityDialog()
                     true

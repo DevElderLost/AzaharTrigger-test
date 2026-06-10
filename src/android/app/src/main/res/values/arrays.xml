@@ -187,6 +187,7 @@
         <item>Combo 3</item>
         <item>Combo 4</item>
         <item>Combo 5</item>
+        <item>Hide Secondary Screen</item>
 </string-array>
 
     <string-array name="cameraImageSourceNames">

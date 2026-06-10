@@ -94,6 +94,10 @@
                 <item
                     android:id="@+id/menu_emulation_adjust_scale_combo_5"
                     android:title="@string/emulation_combo5_scale" />
+
+                    <item
+                        android:id="@+id/menu_emulation_adjust_scale_hide_second_screen"
+                        android:title="@string/emulation_hide_second_screen_scale" />
                         <item
                     android:id="@+id/menu_emulation_adjust_scale_combo_1"
                     android:title="@string/emulation_combo1_scale" />
