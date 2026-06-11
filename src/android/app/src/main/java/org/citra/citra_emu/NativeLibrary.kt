@@ -223,6 +223,7 @@ object NativeLibrary {
         // Custom layout bottom screen direct C++ access
         @JvmStatic external fun setCustomBottomScreen(x: Int, y: Int, width: Int, height: Int)
         @JvmStatic external fun getCustomBottomScreen(): IntArray
+        @JvmStatic external fun getCustomTopScreen(): IntArray
 
     /**
      * Swaps the top and bottom screens.
