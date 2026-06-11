@@ -476,7 +476,7 @@ void Java_org_citra_citra_1emu_NativeLibrary_notifyOrientationChange([[maybe_unu
                                                                      jboolean portrait) {
     Settings::values.layout_option = static_cast<Settings::LayoutOption>(layout_option);
 }
-void Java_org_citra_citra_emu_NativeLibrary_GetCustomTopScreen(
+void Java_org_citra_citra_emu_NativeLibrary_getCustomTopScreen(
     JNIEnv* env, [[maybe_unused]] jclass clazz, jintArray out) {
     jint vals[4] = {
         static_cast<jint>(Settings::values.custom_top_x.GetValue()),
@@ -487,7 +487,7 @@ void Java_org_citra_citra_emu_NativeLibrary_GetCustomTopScreen(
     env->SetIntArrayRegion(out, 0, 4, vals);
 }
 
-void Java_org_citra_citra_emu_NativeLibrary_GetCustomBottomScreen(
+void Java_org_citra_citra_emu_NativeLibrary_getCustomBottomScreen(
     JNIEnv* env, [[maybe_unused]] jclass clazz, jintArray out) {
     jint vals[4] = {
         static_cast<jint>(Settings::values.custom_bottom_x.GetValue()),
@@ -498,7 +498,7 @@ void Java_org_citra_citra_emu_NativeLibrary_GetCustomBottomScreen(
     env->SetIntArrayRegion(out, 0, 4, vals);
 }
 
-void Java_org_citra_citra_emu_NativeLibrary_SetCustomBottomScreen(
+void Java_org_citra_citra_emu_NativeLibrary_setCustomBottomScreen(
     [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz,
     jint x, jint y, jint width, jint height) {
     Settings::values.custom_bottom_x.SetValue(static_cast<u16>(x));
