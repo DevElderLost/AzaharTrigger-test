@@ -501,10 +501,10 @@ void Java_org_citra_citra_emu_NativeLibrary_GetCustomBottomScreen(
 void Java_org_citra_citra_emu_NativeLibrary_SetCustomBottomScreen(
     [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz,
     jint x, jint y, jint width, jint height) {
-    Settings::values.custom_bottom_x      = static_cast<u16>(x);
-    Settings::values.custom_bottom_y      = static_cast<u16>(y);
-    Settings::values.custom_bottom_width  = static_cast<u16>(width);
-    Settings::values.custom_bottom_height = static_cast<u16>(height);
+    Settings::values.custom_bottom_x.SetValue(static_cast<u16>(x));
+    Settings::values.custom_bottom_y.SetValue(static_cast<u16>(y));
+    Settings::values.custom_bottom_width.SetValue(static_cast<u16>(width));
+    Settings::values.custom_bottom_height.SetValue(static_cast<u16>(height));
 }
 
 void Java_org_citra_citra_1emu_NativeLibrary_updateFramebuffer([[maybe_unused]] JNIEnv* env,
