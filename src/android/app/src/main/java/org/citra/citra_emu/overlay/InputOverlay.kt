@@ -93,27 +93,41 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) : SurfaceView(contex
 
     private fun toggleHideSecondaryScreen() {
         val isPortrait = NativeLibrary.isPortraitMode
-        val currentLayout = if (isPortrait) IntSetting.PORTRAIT_SCREEN_LAYOUT.int else IntSetting.SCREEN_LAYOUT.int
-        val customLayoutInt = if (isPortrait) org.citra.citra_emu.display.PortraitScreenLayout.CUSTOM_PORTRAIT_LAYOUT.int else ScreenLayout.CUSTOM_LAYOUT.int
-        if (currentLayout != customLayoutInt) return
         val isHidden = preferences.getBoolean("secondaryScreenHidden", false)
+
         if (!isHidden) {
-            if (isPortrait) {
-                preferences.edit().putInt("backup_bottom_x",IntSetting.PORTRAIT_BOTTOM_X.int).putInt("backup_bottom_y",IntSetting.PORTRAIT_BOTTOM_Y.int).putInt("backup_bottom_width",IntSetting.PORTRAIT_BOTTOM_WIDTH.int).putInt("backup_bottom_height",IntSetting.PORTRAIT_BOTTOM_HEIGHT.int).putBoolean("secondaryScreenHidden",true).apply()
-                IntSetting.PORTRAIT_BOTTOM_X.int=IntSetting.PORTRAIT_TOP_X.int; IntSetting.PORTRAIT_BOTTOM_Y.int=IntSetting.PORTRAIT_TOP_Y.int; IntSetting.PORTRAIT_BOTTOM_WIDTH.int=IntSetting.PORTRAIT_TOP_WIDTH.int; IntSetting.PORTRAIT_BOTTOM_HEIGHT.int=IntSetting.PORTRAIT_TOP_HEIGHT.int
-            } else {
-                preferences.edit().putInt("backup_bottom_x",IntSetting.LANDSCAPE_BOTTOM_X.int).putInt("backup_bottom_y",IntSetting.LANDSCAPE_BOTTOM_Y.int).putInt("backup_bottom_width",IntSetting.LANDSCAPE_BOTTOM_WIDTH.int).putInt("backup_bottom_height",IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int).putBoolean("secondaryScreenHidden",true).apply()
-                IntSetting.LANDSCAPE_BOTTOM_X.int=IntSetting.LANDSCAPE_TOP_X.int; IntSetting.LANDSCAPE_BOTTOM_Y.int=IntSetting.LANDSCAPE_TOP_Y.int; IntSetting.LANDSCAPE_BOTTOM_WIDTH.int=IntSetting.LANDSCAPE_TOP_WIDTH.int; IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int=IntSetting.LANDSCAPE_TOP_HEIGHT.int
-            }
+            // ── Sembunyikan secondary screen ─────────────────────────────────
+            // 1. Backup posisi bottom screen dari C++ langsung
+            val current = NativeLibrary.getCustomBottomScreen()
+            preferences.edit()
+                .putInt("backup_bottom_x",      current[0])
+                .putInt("backup_bottom_y",      current[1])
+                .putInt("backup_bottom_width",  current[2])
+                .putInt("backup_bottom_height", current[3])
+                .putBoolean("secondaryScreenHidden", true)
+                .apply()
+
+            // 2. Ambil koordinat top screen, set bottom = top → tertutup di belakang top
+            val top = NativeLibrary.getCustomTopScreen()
+            NativeLibrary.setCustomBottomScreen(top[0], top[1], top[2], top[3])
         } else {
-            if (isPortrait) {
-                IntSetting.PORTRAIT_BOTTOM_X.int=preferences.getInt("backup_bottom_x",IntSetting.PORTRAIT_BOTTOM_X.int); IntSetting.PORTRAIT_BOTTOM_Y.int=preferences.getInt("backup_bottom_y",IntSetting.PORTRAIT_BOTTOM_Y.int); IntSetting.PORTRAIT_BOTTOM_WIDTH.int=preferences.getInt("backup_bottom_width",IntSetting.PORTRAIT_BOTTOM_WIDTH.int); IntSetting.PORTRAIT_BOTTOM_HEIGHT.int=preferences.getInt("backup_bottom_height",IntSetting.PORTRAIT_BOTTOM_HEIGHT.int)
-            } else {
-                IntSetting.LANDSCAPE_BOTTOM_X.int=preferences.getInt("backup_bottom_x",IntSetting.LANDSCAPE_BOTTOM_X.int); IntSetting.LANDSCAPE_BOTTOM_Y.int=preferences.getInt("backup_bottom_y",IntSetting.LANDSCAPE_BOTTOM_Y.int); IntSetting.LANDSCAPE_BOTTOM_WIDTH.int=preferences.getInt("backup_bottom_width",IntSetting.LANDSCAPE_BOTTOM_WIDTH.int); IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int=preferences.getInt("backup_bottom_height",IntSetting.LANDSCAPE_BOTTOM_HEIGHT.int)
-            }
-            preferences.edit().putBoolean("secondaryScreenHidden",false).remove("backup_bottom_x").remove("backup_bottom_y").remove("backup_bottom_width").remove("backup_bottom_height").apply()
+            // ── Tampilkan kembali secondary screen ───────────────────────────
+            val bx = preferences.getInt("backup_bottom_x",      0)
+            val by = preferences.getInt("backup_bottom_y",      0)
+            val bw = preferences.getInt("backup_bottom_width",  160)
+            val bh = preferences.getInt("backup_bottom_height", 120)
+            NativeLibrary.setCustomBottomScreen(bx, by, bw, bh)
+
+            preferences.edit()
+                .putBoolean("secondaryScreenHidden", false)
+                .remove("backup_bottom_x")
+                .remove("backup_bottom_y")
+                .remove("backup_bottom_width")
+                .remove("backup_bottom_height")
+                .apply()
         }
-        NativeLibrary.reloadSettings()
+
+        // Terapkan ke renderer
         NativeLibrary.updateFramebuffer(isPortrait)
     }
 

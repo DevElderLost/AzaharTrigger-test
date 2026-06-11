@@ -220,6 +220,10 @@ object NativeLibrary {
      */
     external fun updateFramebuffer(isPortrait: Boolean)
 
+        // Custom layout bottom screen direct C++ access
+        @JvmStatic external fun setCustomBottomScreen(x: Int, y: Int, width: Int, height: Int)
+        @JvmStatic external fun getCustomBottomScreen(): IntArray
+
     /**
      * Swaps the top and bottom screens.
      */

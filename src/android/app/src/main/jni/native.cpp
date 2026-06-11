@@ -476,6 +476,37 @@ void Java_org_citra_citra_1emu_NativeLibrary_notifyOrientationChange([[maybe_unu
                                                                      jboolean portrait) {
     Settings::values.layout_option = static_cast<Settings::LayoutOption>(layout_option);
 }
+void Java_org_citra_citra_emu_NativeLibrary_GetCustomTopScreen(
+    JNIEnv* env, [[maybe_unused]] jclass clazz, jintArray out) {
+    jint vals[4] = {
+        static_cast<jint>(Settings::values.custom_top_x.GetValue()),
+        static_cast<jint>(Settings::values.custom_top_y.GetValue()),
+        static_cast<jint>(Settings::values.custom_top_width.GetValue()),
+        static_cast<jint>(Settings::values.custom_top_height.GetValue())
+    };
+    env->SetIntArrayRegion(out, 0, 4, vals);
+}
+
+void Java_org_citra_citra_emu_NativeLibrary_GetCustomBottomScreen(
+    JNIEnv* env, [[maybe_unused]] jclass clazz, jintArray out) {
+    jint vals[4] = {
+        static_cast<jint>(Settings::values.custom_bottom_x.GetValue()),
+        static_cast<jint>(Settings::values.custom_bottom_y.GetValue()),
+        static_cast<jint>(Settings::values.custom_bottom_width.GetValue()),
+        static_cast<jint>(Settings::values.custom_bottom_height.GetValue())
+    };
+    env->SetIntArrayRegion(out, 0, 4, vals);
+}
+
+void Java_org_citra_citra_emu_NativeLibrary_SetCustomBottomScreen(
+    [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jclass clazz,
+    jint x, jint y, jint width, jint height) {
+    Settings::values.custom_bottom_x      = static_cast<u16>(x);
+    Settings::values.custom_bottom_y      = static_cast<u16>(y);
+    Settings::values.custom_bottom_width  = static_cast<u16>(width);
+    Settings::values.custom_bottom_height = static_cast<u16>(height);
+}
+
 void Java_org_citra_citra_1emu_NativeLibrary_updateFramebuffer([[maybe_unused]] JNIEnv* env,
                                                                [[maybe_unused]] jobject obj,
                                                                jboolean is_portrait_mode) {
