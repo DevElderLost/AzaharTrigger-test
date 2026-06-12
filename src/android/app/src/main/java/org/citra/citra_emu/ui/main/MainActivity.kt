@@ -596,10 +596,10 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     private fun refreshAndUpdateHomeMenuNav() {
         homeViewModel.refreshHomeMenuAvailability()
         val (available, _) = homeViewModel.homeMenuAvailable.value
-        binding.navigationView?.menu?.findItem(R.id.bootHomeMenu)?.let {
-            it.isVisible = available
-            it.isEnabled = available
-        }
+        val navView = binding.navigationView ?: return
+        val bootItem = navView.menu.findItem(R.id.bootHomeMenu) ?: return
+        bootItem.isVisible = available
+        bootItem.isEnabled = available
     }
 
 }
