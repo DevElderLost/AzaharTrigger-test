@@ -114,7 +114,6 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setupBootHomeMenuNav()
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
@@ -212,6 +211,7 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     }
 
     override fun onResume() {
+        refreshAndUpdateHomeMenuNav()
         checkUserPermissions()
 
         ThemeUtil.setCorrectTheme(this)
@@ -569,36 +569,15 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     ) { result: Uri? ->
         homeViewModel.selectedGamesDirectory = result
     }
-    // ── Boot HOME Menu navigation ──────────────────────────────────────────
-    private fun setupBootHomeMenuNav() {
-        homeViewModel.refreshHomeMenuAvailability()
-
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                homeViewModel.homeMenuAvailable.collect { (available, _) ->
-                    binding.navigationView?.menu
-                        ?.findItem(R.id.bootHomeMenu)
-                        ?.let { item ->
-                            item.isVisible = available
-                            item.isEnabled = available
-                        }
-                }
-            }
-        }
-
-        binding.navigationView?.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.bootHomeMenu -> { launchBootHomeMenu(); true }
-                else -> false
-            }
-        }
-    }
-
+    // ── Boot HOME Menu — launch langsung (dipanggil dari nav listener) ──────
     fun launchBootHomeMenu() {
         val (available, menuPath) = homeViewModel.homeMenuAvailable.value
         if (!available || menuPath.isEmpty()) {
-            Snackbar.make(binding.root, R.string.boot_home_menu_no_system,
-                          Snackbar.LENGTH_LONG).show()
+            Snackbar.make(
+                binding.root,
+                R.string.boot_home_menu_no_system,
+                Snackbar.LENGTH_LONG
+            ).show()
             return
         }
         val menu = Game(
@@ -606,8 +585,21 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
             path = menuPath,
             filename = ""
         )
-        val action = HomeNavigationDirections.actionGlobalEmulationActivity(menu)
-        binding.root.findNavController().navigate(action)
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.fragment_container) as? NavHostFragment
+        navHostFragment?.navController?.navigate(
+            HomeNavigationDirections.actionGlobalEmulationActivity(menu)
+        )
+    }
+
+    // ── Refresh HOME Menu availability saat activity resume ─────────────────
+    private fun refreshAndUpdateHomeMenuNav() {
+        homeViewModel.refreshHomeMenuAvailability()
+        val (available, _) = homeViewModel.homeMenuAvailable.value
+        binding.navigationView?.menu?.findItem(R.id.bootHomeMenu)?.let {
+            it.isVisible = available
+            it.isEnabled = available
+        }
     }
 
 }
