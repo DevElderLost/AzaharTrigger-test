@@ -4,6 +4,8 @@
 
 package org.citra.citra_emu.ui.main
 
+import android.view.MenuItem
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.snackbar.Snackbar
 import org.citra.citra_emu.model.Game
 import org.citra.citra_emu.HomeNavigationDirections
@@ -596,8 +598,8 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     private fun refreshAndUpdateHomeMenuNav() {
         homeViewModel.refreshHomeMenuAvailability()
         val (available, _) = homeViewModel.homeMenuAvailable.value
-        val navView = binding.navigationView ?: return
-        val bootItem = navView.menu.findItem(R.id.bootHomeMenu) ?: return
+        val navView = binding.navigationView as? BottomNavigationView ?: return
+        val bootItem: MenuItem = navView.menu.findItem(R.id.bootHomeMenu) ?: return
         bootItem.isVisible = available
         bootItem.isEnabled = available
     }
