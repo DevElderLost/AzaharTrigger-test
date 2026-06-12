@@ -4,8 +4,6 @@
 
 package org.citra.citra_emu.viewmodel
 
-import kotlinx.coroutines.flow.StateFlow
-import org.citra.citra_emu.NativeLibrary
 import android.content.res.Resources
 import android.net.Uri
 import androidx.fragment.app.FragmentActivity
@@ -23,19 +21,6 @@ import org.citra.citra_emu.utils.GameHelper
 import org.citra.citra_emu.utils.PermissionsHandler
 
 class HomeViewModel : ViewModel() {
-
-    // ── Boot HOME Menu availability ──────────────────────────────────
-    private val _homeMenuAvailable = MutableStateFlow(Pair(false, ""))
-    val homeMenuAvailable: StateFlow<Pair<Boolean, String>> = _homeMenuAvailable.asStateFlow()
-
-    fun refreshHomeMenuAvailability() {
-        val firstPath = (0..6)
-            .map { NativeLibrary.getHomeMenuPath(it) }
-            .firstOrNull { it.isNotEmpty() }
-        _homeMenuAvailable.value = if (firstPath != null) Pair(true, firstPath)
-                                   else Pair(false, "")
-    }
-
     val navigationVisible get() = _navigationVisible.asStateFlow()
     private val _navigationVisible = MutableStateFlow(Pair(false, false))
 

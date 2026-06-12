@@ -1134,8 +1134,4 @@
     <string name="emulation_combo3_scale">Combo 3 Scale</string>
     <string name="emulation_combo4_scale">Combo 4 Scale</string>
     <string name="emulation_combo5_scale">Combo 5 Scale</string>
-
-    <!-- Boot HOME Menu navigation -->
-    <string name="boot_home_menu_nav">HOME</string>
-    <string name="boot_home_menu_no_system">No HOME Menu installed. Set up System Files first.</string>
 </resources>
