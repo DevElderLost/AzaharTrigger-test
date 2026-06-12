@@ -217,6 +217,7 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
 
         ThemeUtil.setCorrectTheme(this)
         super.onResume()
+        homeViewModel.refreshHomeMenuAvailability()
     }
 
     override fun onDestroy() {
