@@ -172,16 +172,7 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
                     ""
                 )
             }
-        }
-
-        // ── Boot HOME Menu: handle via addOnItemSelectedListener ────────────
-        // NavigationUI.setupWithNavController tidak bisa handle item yang bukan
-        // fragment destination, jadi kita intercept di sini
-        (binding.navigationView as NavigationBarView).addOnItemSelectedListener { item ->
-            if (item.itemId == R.id.bootHomeMenu) {
-                launchBootHomeMenu()
-                true
-            } else {
+        } else {
                 false
             }
         }
@@ -316,6 +307,16 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
             homeViewModel.navigatedToSetup = true
         } else {
             (binding.navigationView as NavigationBarView).setupWithNavController(navController)
+        // ── Boot HOME Menu intercept — dipasang SETELAH setupWithNavController ─
+        (binding.navigationView as NavigationBarView).setOnItemSelectedListener { item ->
+            if (item.itemId == R.id.bootHomeMenu) {
+                launchBootHomeMenu()
+                true
+            } else {
+                navController.navigate(item.itemId)
+                true
+            }
+        }
         }
     }
 
