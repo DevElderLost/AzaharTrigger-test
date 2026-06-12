@@ -371,7 +371,18 @@ void Room::RoomImpl::HandleJoinRequest(const ENetEvent* event) {
         std::lock_guard lock(verify_UID_mutex);
         uid = verify_UID;
     }
-    member.user_data = verify_backend->LoadUserData(uid, token);
+ 
+    // Load user data if verify_backend is available (it should always be available,
+    // but we add a defensive check here for LAN private rooms that use NullBackend)
+    if (verify_backend) {
+        member.user_data = verify_backend->LoadUserData(uid, token);
+    } else {
+        // This shouldn't happen in normal operation, but create an empty user data
+        // to avoid crashes. LAN private rooms should use NullBackend.
+        member.user_data = {};
+        LOG_WARNING(Network, "verify_backend is null while handling join request for user {}. "
+                   "Using empty user data.", nickname);
+    }
 
     if (nickname == room_information.host_username) {
         member.user_data.moderator = true;

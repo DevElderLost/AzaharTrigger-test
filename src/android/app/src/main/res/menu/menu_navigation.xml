@@ -6,6 +6,13 @@
         android:icon="@drawable/selector_controller"
         android:title="@string/home_games" />
 
+
+
+    <item
+        android:id="@+id/bootHomeMenu"
+        android:icon="@drawable/ic_boot_home_menu"
+        android:title="@string/boot_home_menu_nav" />
+
     <item
         android:id="@+id/searchFragment"
         android:icon="@drawable/ic_search"
@@ -15,5 +22,4 @@
         android:id="@+id/homeSettingsFragment"
         android:icon="@drawable/ic_more"
         android:title="@string/home_options" />
-
 </menu>

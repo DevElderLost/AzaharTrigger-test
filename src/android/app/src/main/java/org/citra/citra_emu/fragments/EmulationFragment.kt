@@ -6,8 +6,10 @@ package org.citra.citra_emu.fragments
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Context
 import android.content.DialogInterface
+import android.content.DialogInterface.OnClickListener
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
@@ -30,10 +32,12 @@ import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.Toast.LENGTH_LONG
 import androidx.activity.OnBackPressedCallback
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.res.ResourcesCompat
@@ -69,16 +73,18 @@ import org.citra.citra_emu.display.ScreenAdjustmentUtil
 import org.citra.citra_emu.display.ScreenLayout
 import org.citra.citra_emu.features.settings.model.BooleanSetting
 import org.citra.citra_emu.features.settings.model.IntSetting
-import org.citra.citra_emu.features.settings.model.Settings
 import org.citra.citra_emu.features.settings.model.SettingsViewModel
 import org.citra.citra_emu.features.settings.ui.SettingsActivity
 import org.citra.citra_emu.features.settings.utils.SettingsFile
 import org.citra.citra_emu.model.Game
+import org.citra.citra_emu.utils.AmiiboDatabase.Companion.amiibos
+import org.citra.citra_emu.utils.AmiiboDatabase.Companion.amiibos_series
+import org.citra.citra_emu.utils.AmiiboUsageDatabase
+import org.citra.citra_emu.utils.AmiiboUsageDatabase.Companion.amiibos_usages
 import org.citra.citra_emu.utils.BuildUtil
 import org.citra.citra_emu.utils.DirectoryInitialization
 import org.citra.citra_emu.utils.DirectoryInitialization.DirectoryInitializationState
 import org.citra.citra_emu.utils.EmulationMenuSettings
-import org.citra.citra_emu.utils.FileUtil
 import org.citra.citra_emu.utils.GameHelper
 import org.citra.citra_emu.utils.GameIconUtils
 import org.citra.citra_emu.utils.EmulationLifecycleUtil
@@ -129,6 +135,8 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        AmiiboUsageDatabase.initialize()
+        AmiiboUsageDatabase.initialize2()
         val intent = requireActivity().intent
         var intentUri: Uri? = intent.data
         val oldIntentInfo = Pair(
@@ -839,6 +847,31 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
                     true
                 }
 
+                R.id.menu_emulation_adjust_scale_combo_1 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_1)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_2 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_2)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_3 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_3)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_4 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_4)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_5 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_5)
+                    true
+                }
+
                 R.id.menu_emulation_adjust_opacity -> {
                     showAdjustOpacityDialog()
                     true
@@ -878,22 +911,76 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
             binding.inGameMenu.findViewById(R.id.menu_amiibo)
         )
 
-        popupMenu.menuInflater.inflate(R.menu.menu_amiibo_options, popupMenu.menu)
+        val generate = popupMenu.menu.addSubMenu(0, 0, 0, "Generate File")
+
+        popupMenu.menu.add(0, R.id.menu_emulation_amiibo_load, 0, R.string.menu_emulation_amiibo_load)
+
+        if(hasPrevious) {
+            val prev = popupMenu.menu.add(2, 0, 0, "Previous Amiibo")
+            prev.tooltipText = "@previous"
+        }
+
+        val gameList = amiibos_usages[NativeLibrary.getProgramId()]?.sorted()
+
+        if (gameList != null) {
+            val generateRec = generate.addSubMenu("Recommended")
+            val loadRec = popupMenu.menu.addSubMenu("Recommended")
+
+            for (i in gameList)
+            {
+                val text = amiibos[i] + "    [" + amiibos_series[i.substring(13, 15)] + "]"
+
+                val genItem = generateRec.add(1, 0, 0, text)
+                genItem.tooltipText = i
+
+                val loadItem = loadRec.add(2, 0, 0, text)
+                loadItem.tooltipText = i
+            }
+        }
+
+        val generateFull = generate.addSubMenu("Full List")
+        val loadFull = popupMenu.menu.addSubMenu("Full List")
+
+        popupMenu.menu.add(0, R.id.menu_emulation_amiibo_remove, 0, R.string.menu_emulation_amiibo_remove)
+
+        for (i in amiibos)
+        {
+            val text = i.value + "    [" + amiibos_series[i.key.substring(13, 15)] + "]"
+
+            val genItem = generateFull.add(1, 0, 0, text)
+            genItem.tooltipText = i.key
+
+            val loadItem = loadFull.add(2, 0, 0, text)
+            loadItem.tooltipText = i.key
+        }
 
         popupMenu.setOnMenuItemClickListener {
             when (it.itemId) {
                 R.id.menu_emulation_amiibo_load -> {
                     emulationActivity.openAmiiboFileLauncher.launch(false)
-                    true
                 }
 
                 R.id.menu_emulation_amiibo_remove -> {
                     NativeLibrary.removeAmiibo()
-                    true
                 }
 
-                else -> true
+                else -> when (it.groupId) {
+                    1 -> {
+                        val rand = (1000..9999).random()
+                        val name = "${amiibos[it.tooltipText]} [$rand]"
+
+                        emulationActivity.amiiboId = "${it.tooltipText}"
+                        emulationActivity.amiiboSaver.launch(name)
+                    }
+
+                    2 -> {
+                        val ret = NativeLibrary.loadAmiibo("${it.tooltipText}")
+                        if(ret) hasPrevious = true
+                    }
+                }
             }
+
+            true
         }
 
         popupMenu.show()
@@ -1056,13 +1143,14 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
 
     private fun showToggleControlsDialog() {
         val editor = preferences.edit()
-        val enabledButtons = BooleanArray(16)
+        // Indices 0-15  = tombol standar 3DS
+        // Indices 16-20 = Combo Button 1-5
+        val enabledButtons = BooleanArray(21)
         enabledButtons.forEachIndexed { i: Int, _: Boolean ->
-            // Buttons that are disabled by default
             var defaultValue = true
             when (i) {
-                // TODO: Remove these magic numbers
-                6, 7, 12, 13, 14, 15 -> defaultValue = false
+                // Disabled by default: turbo, swap, home, extra, combo buttons
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
             }
             enabledButtons[i] = preferences.getBoolean("buttonToggle$i", defaultValue)
         }
@@ -1073,6 +1161,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
                 R.array.n3dsButtons, enabledButtons
             ) { _: DialogInterface?, indexSelected: Int, isChecked: Boolean ->
                 editor.putBoolean("buttonToggle$indexSelected", isChecked)
+
             }
             .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
                 editor.apply()
@@ -1251,14 +1340,18 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
             .apply()
 
         val editor = preferences.edit()
-        for (i in 0 until 16) {
+        for (i in 0 until 21) {
             var defaultValue = true
             when (i) {
-                6, 7, 12, 13, 14, 15 -> defaultValue = false
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
             }
             editor.putBoolean("buttonToggle$i", defaultValue)
         }
         editor.apply()
+        // Reset combo button enabled states
+        for (slot in 1..5) {
+            org.citra.citra_emu.overlay.ComboButtonManager.setEnabled(slot, false)
+        }
 
         binding.surfaceInputOverlay.resetButtonPlacement()
     }
@@ -1587,5 +1680,6 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback, Choreographer.Fram
 
     companion object {
         private val perfStatsUpdateHandler = Handler(Looper.myLooper()!!)
+        private var hasPrevious = false
     }
 }

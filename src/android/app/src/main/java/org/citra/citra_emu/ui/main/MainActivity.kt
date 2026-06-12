@@ -4,6 +4,11 @@
 
 package org.citra.citra_emu.ui.main
 
+import android.view.MenuItem
+import com.google.android.material.snackbar.Snackbar
+import org.citra.citra_emu.HomeNavigationDirections
+import org.citra.citra_emu.model.Game
+import androidx.navigation.findNavController
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -212,6 +217,7 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
 
         ThemeUtil.setCorrectTheme(this)
         super.onResume()
+        homeViewModel.refreshHomeMenuAvailability()
     }
 
     override fun onDestroy() {
@@ -297,6 +303,16 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
             homeViewModel.navigatedToSetup = true
         } else {
             (binding.navigationView as NavigationBarView).setupWithNavController(navController)
+        }
+        // Boot HOME Menu intercept — dipasang SETELAH setupWithNavController
+        (binding.navigationView as NavigationBarView).setOnItemSelectedListener { item ->
+            if (item.itemId == R.id.bootHomeMenu) {
+                launchBootHomeMenu()
+                true
+            } else {
+                navController.navigate(item.itemId)
+                true
+            }
         }
     }
 
@@ -467,7 +483,7 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         }
 
         runCatching {
-            NativeLibrary.deleteDocument(nativePath)
+            NativeLibrary.deleteDocument("!$nativePath")
         }
 
         val ret = NativeLibrary.exportZipPass(nativePath)
@@ -565,4 +581,20 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     ) { result: Uri? ->
         homeViewModel.selectedGamesDirectory = result
     }
+    fun launchBootHomeMenu() {
+        val menuPath = homeViewModel.homeMenuAvailable.value.second
+        if (menuPath.isEmpty()) {
+            Snackbar.make(binding.root, R.string.boot_home_menu_no_system,
+                Snackbar.LENGTH_LONG).show()
+            return
+        }
+        val menu = Game(
+            title = getString(R.string.home_menu),
+            path = menuPath,
+            filename = ""
+        )
+        val action = HomeNavigationDirections.actionGlobalEmulationActivity(menu)
+        binding.root.findNavController().navigate(action)
+    }
+
 }
