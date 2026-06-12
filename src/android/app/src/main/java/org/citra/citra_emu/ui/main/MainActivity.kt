@@ -297,17 +297,22 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         val firstTimeSetup = PreferenceManager.getDefaultSharedPreferences(applicationContext)
             .getBoolean(Settings.PREF_FIRST_APP_LAUNCH, true)
 
-        // Boot HOME Menu intercept
-        (binding.navigationView as NavigationBarView).setOnItemSelectedListener { item ->
-            if (item.itemId == R.id.bootHomeMenu) { launchBootHomeMenu(); true }
-            else { navController.navigate(item.itemId); true }
-        }
         if (firstTimeSetup && !homeViewModel.navigatedToSetup) {
             homeViewModel.setupCurrentPage = savedInstanceState?.getInt(KEY_SETUP_CURRENT_PAGE) ?: 0
             navController.navigate(R.id.firstTimeSetupFragment)
             homeViewModel.navigatedToSetup = true
         } else {
             (binding.navigationView as NavigationBarView).setupWithNavController(navController)
+        }
+        // Boot HOME Menu intercept — dipasang SETELAH setupWithNavController
+        (binding.navigationView as NavigationBarView).setOnItemSelectedListener { item ->
+            if (item.itemId == R.id.bootHomeMenu) {
+                launchBootHomeMenu()
+                true
+            } else {
+                navController.navigate(item.itemId)
+                true
+            }
         }
     }
 
