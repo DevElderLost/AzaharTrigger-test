@@ -4,6 +4,7 @@
 
 package org.citra.citra_emu.ui.main
 
+import androidx.navigation.findNavController
 import android.view.MenuItem
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.snackbar.Snackbar
@@ -170,6 +171,18 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
                     SettingsFile.FILE_NAME_CONFIG,
                     ""
                 )
+            }
+        }
+
+        // ── Boot HOME Menu: handle via addOnItemSelectedListener ────────────
+        // NavigationUI.setupWithNavController tidak bisa handle item yang bukan
+        // fragment destination, jadi kita intercept di sini
+        (binding.navigationView as NavigationBarView).addOnItemSelectedListener { item ->
+            if (item.itemId == R.id.bootHomeMenu) {
+                launchBootHomeMenu()
+                true
+            } else {
+                false
             }
         }
 
@@ -573,8 +586,10 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     }
     // ── Boot HOME Menu — launch langsung (dipanggil dari nav listener) ──────
     fun launchBootHomeMenu() {
-        val (available, menuPath) = homeViewModel.homeMenuAvailable.value
-        if (!available || menuPath.isEmpty()) {
+        // Identik dengan tombol Start di SystemFilesFragment
+        // homeMenuAvailable.value.second = path dari NativeLibrary.getHomeMenuPath(region)
+        val menuPath = homeViewModel.homeMenuAvailable.value.second
+        if (menuPath.isEmpty()) {
             Snackbar.make(
                 binding.root,
                 R.string.boot_home_menu_no_system,
@@ -587,11 +602,8 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
             path = menuPath,
             filename = ""
         )
-        val navHostFragment = supportFragmentManager
-            .findFragmentById(R.id.fragment_container) as? NavHostFragment
-        navHostFragment?.navController?.navigate(
-            HomeNavigationDirections.actionGlobalEmulationActivity(menu)
-        )
+        val action = HomeNavigationDirections.actionGlobalEmulationActivity(menu)
+        binding.root.findNavController().navigate(action)
     }
 
     // ── Refresh HOME Menu availability saat activity resume ─────────────────
