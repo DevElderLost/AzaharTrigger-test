@@ -4,12 +4,11 @@
 
 package org.citra.citra_emu.ui.main
 
-import androidx.navigation.findNavController
 import android.view.MenuItem
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.snackbar.Snackbar
-import org.citra.citra_emu.model.Game
 import org.citra.citra_emu.HomeNavigationDirections
+import org.citra.citra_emu.model.Game
+import androidx.navigation.findNavController
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -172,9 +171,6 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
                     ""
                 )
             }
-        } else {
-                false
-            }
         }
 
         // Prevents navigation from being drawn for a short time on recreation if set to hidden
@@ -217,7 +213,6 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     }
 
     override fun onResume() {
-        refreshAndUpdateHomeMenuNav()
         checkUserPermissions()
 
         ThemeUtil.setCorrectTheme(this)
@@ -301,22 +296,17 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         val firstTimeSetup = PreferenceManager.getDefaultSharedPreferences(applicationContext)
             .getBoolean(Settings.PREF_FIRST_APP_LAUNCH, true)
 
+        // Boot HOME Menu intercept
+        (binding.navigationView as NavigationBarView).setOnItemSelectedListener { item ->
+            if (item.itemId == R.id.bootHomeMenu) { launchBootHomeMenu(); true }
+            else { navController.navigate(item.itemId); true }
+        }
         if (firstTimeSetup && !homeViewModel.navigatedToSetup) {
             homeViewModel.setupCurrentPage = savedInstanceState?.getInt(KEY_SETUP_CURRENT_PAGE) ?: 0
             navController.navigate(R.id.firstTimeSetupFragment)
             homeViewModel.navigatedToSetup = true
         } else {
             (binding.navigationView as NavigationBarView).setupWithNavController(navController)
-        // ── Boot HOME Menu intercept — dipasang SETELAH setupWithNavController ─
-        (binding.navigationView as NavigationBarView).setOnItemSelectedListener { item ->
-            if (item.itemId == R.id.bootHomeMenu) {
-                launchBootHomeMenu()
-                true
-            } else {
-                navController.navigate(item.itemId)
-                true
-            }
-        }
         }
     }
 
@@ -585,17 +575,11 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     ) { result: Uri? ->
         homeViewModel.selectedGamesDirectory = result
     }
-    // ── Boot HOME Menu — launch langsung (dipanggil dari nav listener) ──────
     fun launchBootHomeMenu() {
-        // Identik dengan tombol Start di SystemFilesFragment
-        // homeMenuAvailable.value.second = path dari NativeLibrary.getHomeMenuPath(region)
         val menuPath = homeViewModel.homeMenuAvailable.value.second
         if (menuPath.isEmpty()) {
-            Snackbar.make(
-                binding.root,
-                R.string.boot_home_menu_no_system,
-                Snackbar.LENGTH_LONG
-            ).show()
+            Snackbar.make(binding.root, R.string.boot_home_menu_no_system,
+                Snackbar.LENGTH_LONG).show()
             return
         }
         val menu = Game(
@@ -605,16 +589,6 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         )
         val action = HomeNavigationDirections.actionGlobalEmulationActivity(menu)
         binding.root.findNavController().navigate(action)
-    }
-
-    // ── Refresh HOME Menu availability saat activity resume ─────────────────
-    private fun refreshAndUpdateHomeMenuNav() {
-        homeViewModel.refreshHomeMenuAvailability()
-        val (available, _) = homeViewModel.homeMenuAvailable.value
-        val navView = binding.navigationView as? BottomNavigationView ?: return
-        val bootItem: MenuItem = navView.menu.findItem(R.id.bootHomeMenu) ?: return
-        bootItem.isVisible = available
-        bootItem.isEnabled = available
     }
 
 }
