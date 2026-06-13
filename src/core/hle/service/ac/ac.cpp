@@ -242,7 +242,7 @@ void Module::Interface::GetCurrentAPInfo(Kernel::HLERequestContext& ctx) {
 
     IPC::RequestBuilder rb = rp.MakeBuilder(1, 2);
     rb.Push(ResultSuccess);
-    rb.PushStaticBuffer(std::make_shared<std::vector<u8>>(ap_info.data.begin(), ap_info.data.end()), 0);
+    rb.PushStaticBuffer(std::vector<u8>(ap_info.data.begin(), ap_info.data.end()), 0);
 
     LOG_WARNING(Service_AC, "(STUBBED) called, size={}, returning dummy AP info", size);
 }
