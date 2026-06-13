@@ -221,22 +221,6 @@ protected:
         std::array<u8, 0x34> data{};
     };
 
-    // APInfo: data access point yang sedang terhubung
-    // Dikembalikan oleh GetCurrentAPInfo (command 0x000E)
-    // Total size harus 0x34 bytes sesuai protokol 3DS
-    struct APInfo {
-        std::array<u8, 6> bssid;       // MAC address AP
-        std::array<u8, 6> padding1;
-        u8 ssid_len;                   // Panjang SSID
-        std::array<u8, 32> ssid;       // SSID string (max 32 char)
-        u8 padding2;
-        u16 channel;                   // WiFi channel
-        u8 signal_strength;            // Kekuatan sinyal 0-100
-        u8 link_level;                 // Level link 0-3
-        std::array<u8, 6> padding3;
-        u32 network_id;                // Network ID
-    };
-    static_assert(sizeof(APInfo) == 0x34, "APInfo size mismatch");
 
     ACConfig default_config{};
 
