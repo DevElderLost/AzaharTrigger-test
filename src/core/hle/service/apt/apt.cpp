@@ -772,6 +772,17 @@ void Module::APTInterface::PrepareToStartLibraryApplet(Kernel::HLERequestContext
 
     LOG_DEBUG(Service_APT, "called, applet_id={:08X}", applet_id);
 
+    // Jika applet tidak terdaftar di emulator (misal C502 Nintendo Network applet),
+    // return ResultSuccess agar game tidak crash dan tetap bisa lanjut ke online.
+    if (!apt->applet_manager->IsRegistered(applet_id)) {
+        LOG_WARNING(Service_APT,
+                    "(BYPASS) Applet {:08X} not registered, returning success to allow online",
+                    static_cast<u32>(applet_id));
+        IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
+        rb.Push(ResultSuccess);
+        return;
+    }
+
     IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
     rb.Push(apt->applet_manager->PrepareToStartLibraryApplet(applet_id));
 }
