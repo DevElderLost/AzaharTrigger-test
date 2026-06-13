@@ -19,7 +19,7 @@ AC_U::AC_U(std::shared_ptr<Module> ac) : Module::Interface(std::move(ac), "ac:u"
         {0x000A, nullptr, "GetLastErrorCode"},
         {0x000C, &AC_U::GetStatus, "GetStatus"},
         {0x000D, &AC_U::GetWifiStatus, "GetWifiStatus"},
-        {0x000E, nullptr, "GetCurrentAPInfo"},
+        {0x000E, &AC_U::GetCurrentAPInfo, "GetCurrentAPInfo"},
         {0x0010, nullptr, "GetCurrentNZoneInfo"},
         {0x0011, nullptr, "GetNZoneApNumService"},
         {0x001D, nullptr, "ScanAPs"},
