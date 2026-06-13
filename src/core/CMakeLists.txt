@@ -146,6 +146,8 @@ add_library(citra_core STATIC EXCLUDE_FROM_ALL
     hle/applets/applet.h
     hle/applets/erreula.cpp
     hle/applets/erreula.h
+    hle/applets/network_applet.cpp
+    hle/applets/network_applet.h
     hle/applets/mii_selector.cpp
     hle/applets/mii_selector.h
     hle/applets/mint.cpp

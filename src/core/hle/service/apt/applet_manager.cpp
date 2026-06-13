@@ -9,9 +9,11 @@
 #include "core/frontend/input.h"
 #include "core/hle/applets/applet.h"
 #include "core/hle/applets/erreula.h"
+#include "core/hle/applets/network_applet.h"
 #include "core/hle/applets/mii_selector.h"
 #include "core/hle/applets/mint.h"
 #include "core/hle/applets/swkbd.h"
+#include "core/hle/applets/network_applet.h"
 #include "core/hle/service/am/am.h"
 #include "core/hle/service/apt/applet_manager.h"
 #include "core/hle/service/apt/errors.h"
@@ -90,7 +92,8 @@ static constexpr std::array<AppletTitleData, NumApplets> applet_titleids = {{
     {{AppletId::SnoteApp, AppletId::SnoteApp2},
      {0x400300000C402, 0x400300000CC02, 0x400300000D402, 0x400300000C402, 0x400300000DC02,
       0x400300000E202, 0x400300000E802}},
-    {{AppletId::Error, AppletId::Error2},
+    {{AppletId::NetworkApplet, [](...) { return std::make_shared<HLE::Applets::NetworkApplet>(...); }},
+        {AppletId::Error, AppletId::Error2},
      {0x400300000C502, 0x400300000C502, 0x400300000C502, 0x400300000C502, 0x400300000CF02,
       0x400300000CF02, 0x400300000CF02}},
     {{AppletId::Mint, AppletId::Mint2},
