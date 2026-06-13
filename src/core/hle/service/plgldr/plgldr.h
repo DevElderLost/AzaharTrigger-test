@@ -125,6 +125,7 @@ private:
     void GetPLGLDRVersion(Kernel::HLERequestContext& ctx);
     void GetArbiter(Kernel::HLERequestContext& ctx);
     void GetPluginPath(Kernel::HLERequestContext& ctx);
+    void GetVersion(Kernel::HLERequestContext& ctx); // 0x000E
 
     template <class Archive>
     void serialize(Archive& ar, const unsigned int);

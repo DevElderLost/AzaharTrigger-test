@@ -177,6 +177,21 @@ public:
          */
         void SetClientVersion(Kernel::HLERequestContext& ctx);
 
+        /**
+         * AC::GetCurrentAPInfo service function (0x000E)
+         * Mengembalikan info AP yang sedang terhubung.
+         * Di emulator dikembalikan data dummy agar Nimbus/PIA tidak gagal.
+         *  Inputs:
+         *      1 : ukuran output buffer
+         *      2 : mapped write buffer descriptor
+         *      3 : pointer ke buffer output APInfo
+         *  Outputs:
+         *      1 : Result, 0 = sukses
+         *      2 : mapped buffer descriptor
+         *      3 : pointer ke buffer output
+         */
+        void GetCurrentAPInfo(Kernel::HLERequestContext& ctx);
+
     protected:
         std::shared_ptr<Module> ac;
     };
@@ -198,6 +213,14 @@ protected:
     struct ACConfig {
         std::array<u8, 0x200> data;
     };
+
+    // APInfo: 0x34 bytes sesuai protokol AC service 3DS
+    // Dikembalikan oleh GetCurrentAPInfo (command 0x000E)
+    // Disimpan sebagai raw array untuk menghindari masalah padding/alignment
+    struct APInfo {
+        std::array<u8, 0x34> data{};
+    };
+
 
     ACConfig default_config{};
 
