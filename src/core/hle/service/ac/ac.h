@@ -177,6 +177,21 @@ public:
          */
         void SetClientVersion(Kernel::HLERequestContext& ctx);
 
+        /**
+         * AC::GetCurrentAPInfo service function (0x000E)
+         * Mengembalikan info AP yang sedang terhubung.
+         * Di emulator dikembalikan data dummy agar Nimbus/PIA tidak gagal.
+         *  Inputs:
+         *      1 : ukuran output buffer
+         *      2 : mapped write buffer descriptor
+         *      3 : pointer ke buffer output APInfo
+         *  Outputs:
+         *      1 : Result, 0 = sukses
+         *      2 : mapped buffer descriptor
+         *      3 : pointer ke buffer output
+         */
+        void GetCurrentAPInfo(Kernel::HLERequestContext& ctx);
+
     protected:
         std::shared_ptr<Module> ac;
     };
@@ -198,6 +213,23 @@ protected:
     struct ACConfig {
         std::array<u8, 0x200> data;
     };
+
+    // APInfo: data access point yang sedang terhubung
+    // Dikembalikan oleh GetCurrentAPInfo (command 0x000E)
+    // Total size harus 0x34 bytes sesuai protokol 3DS
+    struct APInfo {
+        std::array<u8, 6> bssid;       // MAC address AP
+        std::array<u8, 6> padding1;
+        u8 ssid_len;                   // Panjang SSID
+        std::array<u8, 32> ssid;       // SSID string (max 32 char)
+        u8 padding2;
+        u16 channel;                   // WiFi channel
+        u8 signal_strength;            // Kekuatan sinyal 0-100
+        u8 link_level;                 // Level link 0-3
+        std::array<u8, 6> padding3;
+        u32 network_id;                // Network ID
+    };
+    static_assert(sizeof(APInfo) == 0x34, "APInfo size mismatch");
 
     ACConfig default_config{};
 
