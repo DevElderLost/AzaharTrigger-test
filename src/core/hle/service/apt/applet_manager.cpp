@@ -92,7 +92,7 @@ static constexpr std::array<AppletTitleData, NumApplets> applet_titleids = {{
     {{AppletId::SnoteApp, AppletId::SnoteApp2},
      {0x400300000C402, 0x400300000CC02, 0x400300000D402, 0x400300000C402, 0x400300000DC02,
       0x400300000E202, 0x400300000E802}},
-        {AppletId::Error, AppletId::Error2},
+    {{AppletId::Error, AppletId::Error2},
      {0x400300000C502, 0x400300000C502, 0x400300000C502, 0x400300000C502, 0x400300000CF02,
       0x400300000CF02, 0x400300000CF02}},
     {{AppletId::Mint, AppletId::Mint2},
