@@ -226,32 +226,6 @@ void Module::Interface::GetCurrentAPInfo(Kernel::HLERequestContext& ctx) {
     [[maybe_unused]] u32 size = rp.Pop<u32>();
     auto output_buffer = rp.PopMappedBuffer();
 
-    // Kembalikan data AP dummy agar Nimbus/PIA dapat melanjutkan autentikasi
-    // Hardware asli akan mengembalikan data WiFi AP yang sebenarnya
-    Module::APInfo ap_info{};
-    ap_info.bssid = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01}; // Locally administered MAC
-    const char* dummy_ssid = "EmulatorAP";
-    ap_info.ssid_len = static_cast<u8>(std::strlen(dummy_ssid));
-    std::memcpy(ap_info.ssid.data(), dummy_ssid, ap_info.ssid_len);
-    ap_info.channel = 6;
-    ap_info.signal_strength = 100;
-    ap_info.link_level = 3;
-    ap_info.network_id = 1;
-
-    output_buffer.Write(&ap_info, 0, std::min(output_buffer.GetSize(), sizeof(ap_info)));
-
-    IPC::RequestBuilder rb = rp.MakeBuilder(1, 2);
-    rb.Push(ResultSuccess);
-    rb.PushMappedBuffer(output_buffer);
-
-    LOG_WARNING(Service_AC, "(STUBBED) called, returning dummy AP info");
-}
-
-void Module::Interface::GetCurrentAPInfo(Kernel::HLERequestContext& ctx) {
-    IPC::RequestParser rp(ctx);
-    [[maybe_unused]] u32 size = rp.Pop<u32>();
-    auto output_buffer = rp.PopMappedBuffer();
-
     // Isi APInfo dummy (0x34 bytes) agar Nimbus/PIA dapat melanjutkan autentikasi
     // Offset sesuai layout protokol AC service 3DS
     Module::APInfo ap_info{};
