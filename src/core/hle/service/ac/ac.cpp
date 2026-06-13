@@ -247,6 +247,48 @@ void Module::Interface::GetCurrentAPInfo(Kernel::HLERequestContext& ctx) {
     LOG_WARNING(Service_AC, "(STUBBED) called, returning dummy AP info");
 }
 
+void Module::Interface::GetCurrentAPInfo(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+    [[maybe_unused]] u32 size = rp.Pop<u32>();
+    auto output_buffer = rp.PopMappedBuffer();
+
+    // Isi APInfo dummy (0x34 bytes) agar Nimbus/PIA dapat melanjutkan autentikasi
+    // Offset sesuai layout protokol AC service 3DS
+    Module::APInfo ap_info{};
+    // BSSID: 02:00:00:00:00:01 (locally administered, emulator dummy)
+    ap_info.data[0x00] = 0x02;
+    ap_info.data[0x01] = 0x00;
+    ap_info.data[0x02] = 0x00;
+    ap_info.data[0x03] = 0x00;
+    ap_info.data[0x04] = 0x00;
+    ap_info.data[0x05] = 0x01;
+    // SSID: "EmulatorAP" mulai offset 0x08
+    const char* dummy_ssid = "EmulatorAP";
+    const u8 ssid_len = static_cast<u8>(std::strlen(dummy_ssid));
+    std::memcpy(&ap_info.data[0x08], dummy_ssid, ssid_len);
+    // ssid_len di offset 0x28
+    ap_info.data[0x28] = ssid_len;
+    // channel = 6 di offset 0x29
+    ap_info.data[0x29] = 6;
+    // signal_strength = 100 di offset 0x2A
+    ap_info.data[0x2A] = 100;
+    // link_level = 3 di offset 0x2B
+    ap_info.data[0x2B] = 3;
+    // network_id = 1 di offset 0x30 (little-endian u32)
+    ap_info.data[0x30] = 1;
+    ap_info.data[0x31] = 0;
+    ap_info.data[0x32] = 0;
+    ap_info.data[0x33] = 0;
+
+    output_buffer.Write(&ap_info, 0, std::min(output_buffer.GetSize(), sizeof(ap_info)));
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(1, 2);
+    rb.Push(ResultSuccess);
+    rb.PushMappedBuffer(output_buffer);
+
+    LOG_WARNING(Service_AC, "(STUBBED) called, returning dummy AP info");
+}
+
 Module::Interface::Interface(std::shared_ptr<Module> ac, const char* name, u32 max_session)
     : ServiceFramework(name, max_session), ac(std::move(ac)) {}
 

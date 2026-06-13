@@ -214,6 +214,13 @@ protected:
         std::array<u8, 0x200> data;
     };
 
+    // APInfo: 0x34 bytes sesuai protokol AC service 3DS
+    // Dikembalikan oleh GetCurrentAPInfo (command 0x000E)
+    // Disimpan sebagai raw array untuk menghindari masalah padding/alignment
+    struct APInfo {
+        std::array<u8, 0x34> data{};
+    };
+
     // APInfo: data access point yang sedang terhubung
     // Dikembalikan oleh GetCurrentAPInfo (command 0x000E)
     // Total size harus 0x34 bytes sesuai protokol 3DS
