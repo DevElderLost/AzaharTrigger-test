@@ -292,18 +292,6 @@ void PLG_LDR::GetArbiter(Kernel::HLERequestContext& ctx) {
 void PLG_LDR::GetVersion(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp(ctx);
 
-    // Kembalikan versi plgldr (1.0.2) sama seperti GetPLGLDRVersion
-    // Nimbus 2.0 memanggil ini (0x000E) untuk cek kompatibilitas plugin loader
-    IPC::RequestBuilder rb = rp.MakeBuilder(2, 0);
-    rb.Push(ResultSuccess);
-    rb.Push(plgldr_version.raw);
-
-    LOG_DEBUG(Service_PLGLDR, "GetVersion called, returning {:08X}", plgldr_version.raw);
-}
-
-void PLG_LDR::GetVersion(Kernel::HLERequestContext& ctx) {
-    IPC::RequestParser rp(ctx);
-
     // Kembalikan versi plgldr (1.0.2)
     // Nimbus 2.0 memanggil 0x000E untuk cek kompatibilitas plugin loader
     IPC::RequestBuilder rb = rp.MakeBuilder(2, 0);
