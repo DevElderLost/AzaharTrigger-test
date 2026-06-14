@@ -1796,6 +1796,136 @@ void HTTP_C::SetSSLOpt(Kernel::HLERequestContext& ctx) {
     rb.Push(ResultSuccess);
 }
 
+void HTTP_C::CreateRootCertChain(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+
+    ++root_ca_chain_counter;
+    auto chain = std::make_shared<RootCertChain>();
+    chain->handle = root_ca_chain_counter;
+    auto* session_data = GetSessionData(ctx.Session());
+    chain->session_id = session_data ? session_data->session_id : 0;
+    root_ca_chains.emplace(root_ca_chain_counter, chain);
+
+    LOG_DEBUG(Service_HTTP, "CreateRootCertChain handle={}", root_ca_chain_counter);
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(2, 0);
+    rb.Push(ResultSuccess);
+    rb.Push<u32>(root_ca_chain_counter);
+}
+
+void HTTP_C::DestroyRootCertChain(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+    const u32 chain_handle = rp.Pop<u32>();
+
+    LOG_DEBUG(Service_HTTP, "DestroyRootCertChain handle={}", chain_handle);
+
+    auto it = root_ca_chains.find(chain_handle);
+    if (it != root_ca_chains.end()) {
+        root_ca_chains.erase(it);
+    }
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
+    rb.Push(ResultSuccess);
+}
+
+void HTTP_C::RootCertChainAddCert(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+    const u32 chain_handle = rp.Pop<u32>();
+    [[maybe_unused]] const u32 cert_size = rp.Pop<u32>();
+    auto cert_buffer = rp.PopMappedBuffer();
+
+    LOG_DEBUG(Service_HTTP, "RootCertChainAddCert chain_handle={} size={}", chain_handle, cert_size);
+
+    auto it = root_ca_chains.find(chain_handle);
+    if (it == root_ca_chains.end()) {
+        LOG_ERROR(Service_HTTP, "RootCertChainAddCert: chain {} not found", chain_handle);
+        IPC::RequestBuilder rb = rp.MakeBuilder(1, 2);
+        rb.Push(ResultSuccess); // Return success anyway to avoid game errors
+        rb.PushMappedBuffer(cert_buffer);
+        return;
+    }
+
+    // Store certificate data
+    RootCertChain::RootCACert cert;
+    cert.handle = static_cast<u32>(it->second->certificates.size()) + 1;
+    cert.session_id = it->second->session_id;
+    cert.certificate.resize(cert_size);
+    cert_buffer.Read(cert.certificate.data(), 0, cert_size);
+    it->second->certificates.push_back(std::move(cert));
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(1, 2);
+    rb.Push(ResultSuccess);
+    rb.PushMappedBuffer(cert_buffer);
+}
+
+void HTTP_C::RootCertChainAddDefaultCert(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+    const u32 chain_handle = rp.Pop<u32>();
+    const u32 cert_id = rp.Pop<u32>();
+
+    LOG_DEBUG(Service_HTTP, "RootCertChainAddDefaultCert chain_handle={} cert_id={}",
+              chain_handle, cert_id);
+
+    // On emulator we just acknowledge this - actual cert validation is handled by libcurl
+    // which uses the system trust store. Returning success allows the game to proceed.
+    auto it = root_ca_chains.find(chain_handle);
+    if (it != root_ca_chains.end()) {
+        RootCertChain::RootCACert cert;
+        cert.handle = static_cast<u32>(it->second->certificates.size()) + 1;
+        cert.session_id = it->second->session_id;
+        // Empty cert - libcurl will use system store
+        it->second->certificates.push_back(std::move(cert));
+    }
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
+    rb.Push(ResultSuccess);
+}
+
+void HTTP_C::RootCertChainRemoveCert(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+    const u32 chain_handle = rp.Pop<u32>();
+    const u32 cert_handle  = rp.Pop<u32>();
+
+    LOG_DEBUG(Service_HTTP, "RootCertChainRemoveCert chain={} cert={}", chain_handle, cert_handle);
+
+    auto chain_it = root_ca_chains.find(chain_handle);
+    if (chain_it != root_ca_chains.end()) {
+        auto& certs = chain_it->second->certificates;
+        certs.erase(std::remove_if(certs.begin(), certs.end(),
+                                   [cert_handle](const RootCertChain::RootCACert& c) {
+                                       return c.handle == cert_handle;
+                                   }),
+                    certs.end());
+    }
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
+    rb.Push(ResultSuccess);
+}
+
+void HTTP_C::SelectRootCertChain(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+    const u32 context_handle = rp.Pop<u32>();
+    const u32 chain_handle   = rp.Pop<u32>();
+
+    LOG_DEBUG(Service_HTTP, "SelectRootCertChain context={} chain={}", context_handle, chain_handle);
+
+    auto context_it = contexts.find(context_handle);
+    if (context_it == contexts.end()) {
+        LOG_ERROR(Service_HTTP, "SelectRootCertChain: context {} not found", context_handle);
+        IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
+        rb.Push(ResultSuccess);
+        return;
+    }
+
+    auto chain_it = root_ca_chains.find(chain_handle);
+    if (chain_it != root_ca_chains.end()) {
+        context_it->second.ssl_config.root_ca_chain = chain_it->second;
+    }
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(1, 0);
+    rb.Push(ResultSuccess);
+}
+
 void HTTP_C::OpenClientCertContext(Kernel::HLERequestContext& ctx) {
     IPC::RequestParser rp(ctx);
     u32 cert_size = rp.Pop<u32>();
@@ -2223,18 +2353,18 @@ HTTP_C::HTTP_C() : ServiceFramework("http:C", 32) {
         {0x0023, &HTTP_C::GetResponseStatusCodeTimeout, "GetResponseStatusCodeTimeout"},
         {0x0024, &HTTP_C::AddTrustedRootCA, "AddTrustedRootCA"},
         {0x0025, &HTTP_C::AddDefaultCert, "AddDefaultCert"},
-        {0x0026, nullptr, "SelectRootCertChain"},
+        {0x0026, &HTTP_C::SelectRootCertChain, "SelectRootCertChain"},
         {0x0027, nullptr, "SetClientCert"},
         {0x0028, &HTTP_C::SetDefaultClientCert, "SetDefaultClientCert"},
         {0x0029, &HTTP_C::SetClientCertContext, "SetClientCertContext"},
         {0x002A, &HTTP_C::GetSSLError, "GetSSLError"},
         {0x002B, &HTTP_C::SetSSLOpt, "SetSSLOpt"},
         {0x002C, nullptr, "SetSSLClearOpt"},
-        {0x002D, nullptr, "CreateRootCertChain"},
-        {0x002E, nullptr, "DestroyRootCertChain"},
-        {0x002F, nullptr, "RootCertChainAddCert"},
-        {0x0030, nullptr, "RootCertChainAddDefaultCert"},
-        {0x0031, nullptr, "RootCertChainRemoveCert"},
+        {0x002D, &HTTP_C::CreateRootCertChain, "CreateRootCertChain"},
+        {0x002E, &HTTP_C::DestroyRootCertChain, "DestroyRootCertChain"},
+        {0x002F, &HTTP_C::RootCertChainAddCert, "RootCertChainAddCert"},
+        {0x0030, &HTTP_C::RootCertChainAddDefaultCert, "RootCertChainAddDefaultCert"},
+        {0x0031, &HTTP_C::RootCertChainRemoveCert, "RootCertChainRemoveCert"},
         {0x0032, &HTTP_C::OpenClientCertContext, "OpenClientCertContext"},
         {0x0033, &HTTP_C::OpenDefaultClientCertContext, "OpenDefaultClientCertContext"},
         {0x0034, &HTTP_C::CloseClientCertContext, "CloseClientCertContext"},
