@@ -221,6 +221,32 @@ void Module::Interface::SetClientVersion(Kernel::HLERequestContext& ctx) {
     rb.Push(ResultSuccess);
 }
 
+void Module::Interface::GetCurrentAPInfo(Kernel::HLERequestContext& ctx) {
+    IPC::RequestParser rp(ctx);
+    const u32 size = rp.Pop<u32>();
+
+    // Isi APInfo dummy (0x34 bytes) agar Nimbus/PIA dapat melanjutkan autentikasi
+    Module::APInfo ap_info{};
+    // BSSID: 02:00:00:00:00:01 (locally administered, emulator dummy)
+    ap_info.data[0x00] = 0x02;
+    ap_info.data[0x05] = 0x01;
+    // SSID: "EmulatorAP" mulai offset 0x08
+    const char* dummy_ssid = "EmulatorAP";
+    const u8 ssid_len = static_cast<u8>(std::strlen(dummy_ssid));
+    std::memcpy(&ap_info.data[0x08], dummy_ssid, ssid_len);
+    ap_info.data[0x28] = ssid_len;  // ssid_len
+    ap_info.data[0x29] = 6;         // channel
+    ap_info.data[0x2A] = 100;       // signal_strength
+    ap_info.data[0x2B] = 3;         // link_level
+    ap_info.data[0x30] = 1;         // network_id (little-endian)
+
+    IPC::RequestBuilder rb = rp.MakeBuilder(1, 2);
+    rb.Push(ResultSuccess);
+    rb.PushStaticBuffer(std::vector<u8>(ap_info.data.begin(), ap_info.data.end()), 0);
+
+    LOG_WARNING(Service_AC, "(STUBBED) called, size={}, returning dummy AP info", size);
+}
+
 Module::Interface::Interface(std::shared_ptr<Module> ac, const char* name, u32 max_session)
     : ServiceFramework(name, max_session), ac(std::move(ac)) {}
 

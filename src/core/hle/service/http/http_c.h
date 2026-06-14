@@ -816,6 +816,12 @@ private:
      *      1 : Result of function, 0 on success, otherwise error code
      */
     void OpenClientCertContext(Kernel::HLERequestContext& ctx);
+    void CreateRootCertChain(Kernel::HLERequestContext& ctx);
+    void DestroyRootCertChain(Kernel::HLERequestContext& ctx);
+    void RootCertChainAddCert(Kernel::HLERequestContext& ctx);
+    void RootCertChainAddDefaultCert(Kernel::HLERequestContext& ctx);
+    void RootCertChainRemoveCert(Kernel::HLERequestContext& ctx);
+    void SelectRootCertChain(Kernel::HLERequestContext& ctx);
 
     /**
      * HTTP_C::OpenDefaultClientCertContext service function
@@ -895,6 +901,12 @@ private:
 
     /// Global list of  ClientCert contexts currently opened.
     std::unordered_map<ClientCertContext::Handle, std::shared_ptr<ClientCertContext>> client_certs;
+
+    /// The next handle number to use when a new RootCertChain is created.
+    RootCertChain::Handle root_ca_chain_counter = 0;
+
+    /// Global list of RootCertChain contexts currently opened.
+    std::unordered_map<RootCertChain::Handle, std::shared_ptr<RootCertChain>> root_ca_chains;
 
     ClCertAData ClCertA;
 

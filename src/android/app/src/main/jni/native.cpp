@@ -45,6 +45,7 @@
 #include "core/hle/service/nfc/nfc.h"
 #include "core/hw/unique_data.h"
 #include "core/loader/loader.h"
+#include "core/loader/ncch.h"
 #include "core/savestate.h"
 #include "core/system_titles.h"
 #include "core/zip_pass.h"
@@ -1001,6 +1002,17 @@ void Java_org_citra_citra_1emu_NativeLibrary_reloadCameraDevices([[maybe_unused]
     if (g_ndk_factory) {
         g_ndk_factory->ReloadCameraDevices();
     }
+}
+
+jstring Java_org_citra_citra_1emu_NativeLibrary_getProgramId([[maybe_unused]] JNIEnv* env,
+                                                             [[maybe_unused]] jobject obj) {
+    return ToJString(env, Loader::getProgramId());
+}
+
+jboolean Java_org_citra_citra_1emu_NativeLibrary_makeAmiibo(JNIEnv* env,
+                                                            [[maybe_unused]] jobject obj,
+                                                            jstring id, jstring filepath) {
+    return Service::NFC::makeAmiiboFile(GetJString(env, id), GetJString(env, filepath));
 }
 
 jboolean Java_org_citra_citra_1emu_NativeLibrary_loadAmiibo(JNIEnv* env,
