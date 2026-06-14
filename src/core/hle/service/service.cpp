@@ -100,7 +100,7 @@ const std::array<ServiceModuleInfo, 41> service_module_map{
      {"SOC", 0x00040130'00002E02, SOC::InstallInterfaces, false},
      {"SSL", 0x00040130'00002F02, SSL::InstallInterfaces, false},
      {"PS", 0x00040130'00003102, PS::InstallInterfaces, false},
-     {"PLGLDR", 0x00040130'00006902, PLGLDR::InstallInterfaces, false},
+     {"PLGLDR", 0x00040130'00006902, PLGLDR::InstallInterfaces, true},
      {"MCU", 0x00040130'00001F02, MCU::InstallInterfaces, false},
      // no HLE implementation
      {"CDC", 0x00040130'00001802, nullptr, false},
