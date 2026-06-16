@@ -650,9 +650,13 @@ object NativeLibrary {
     // Notifies that the activity is now in foreground and camera devices can now be reloaded
     external fun reloadCameraDevices()
 
+    external fun makeAmiibo(id: String?, filepath: String?): Boolean
+
     external fun loadAmiibo(path: String?): Boolean
 
     external fun removeAmiibo()
+
+    external fun getProgramId(): String
 
     const val SAVESTATE_SLOT_COUNT = 11
     const val QUICKSAVE_SLOT = 0
@@ -1047,6 +1051,13 @@ object NativeLibrary {
         const val BUTTON_GPIO14 = 782
         const val BUTTON_SWAP = 800
         const val BUTTON_TURBO = 801
+
+        // Virtual IDs for Combo Buttons (handled in InputOverlay, NOT sent to core)
+        const val BUTTON_COMBO_1 = 900
+        const val BUTTON_COMBO_2 = 901
+        const val BUTTON_COMBO_3 = 902
+        const val BUTTON_COMBO_4 = 903
+        const val BUTTON_COMBO_5 = 904
     }
 
     /**

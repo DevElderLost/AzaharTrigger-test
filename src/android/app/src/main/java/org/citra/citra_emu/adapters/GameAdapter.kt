@@ -8,7 +8,6 @@ import android.graphics.drawable.Icon
 import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
-import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -233,19 +232,7 @@ class GameAdapter(
                 )
             )
 
-            binding.textGameTitle.postDelayed(
-                {
-                    binding.textGameTitle.ellipsize = TextUtils.TruncateAt.MARQUEE
-                    binding.textGameTitle.isSelected = true
-
-                    binding.textCompany.ellipsize = TextUtils.TruncateAt.MARQUEE
-                    binding.textCompany.isSelected = true
-
-                    binding.textGameRegion.ellipsize = TextUtils.TruncateAt.MARQUEE
-                    binding.textGameRegion.isSelected = true
-                },
-                3000
-            )
+            // Marquee dihapus — layout icon-only tidak menampilkan teks
         }
     }
 
@@ -575,6 +562,11 @@ class GameAdapter(
         val bottomSheetBehavior = bottomSheetDialog.getBehavior()
         bottomSheetBehavior.skipCollapsed = true
         bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
+        // Fix: landscape mode agar BottomSheet tidak terpotong
+        if (context.resources.configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            bottomSheetBehavior.peekHeight = context.resources.displayMetrics.heightPixels
+        }
 
         bottomSheetDialog.show()
     }
