@@ -14,21 +14,23 @@
     app:cardElevation="2dp">
 
     <!-- cardContents dipertahankan agar binding.cardContents tetap valid -->
-    <!-- paddingTop 100% = rasio 1:1 square tanpa ConstraintLayout -->
-    <FrameLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/card_contents"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="100%">
+        android:layout_height="wrap_content">
 
-        <!-- Icon game mengisi seluruh area card secara square -->
+        <!-- Icon game 1:1 square via dimensionRatio -->
         <ImageView
             android:id="@+id/image_game_screen"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="top"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
             android:scaleType="centerCrop"
-            android:contentDescription="@string/grid_menu_icon_overlay" />
+            android:contentDescription="@string/grid_menu_icon_overlay"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintDimensionRatio="1:1" />
 
         <!-- Cartridge badge — pojok kanan bawah -->
         <ImageView
@@ -60,6 +62,6 @@
             android:layout_height="0dp"
             android:visibility="gone" />
 
-    </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </com.google.android.material.card.MaterialCardView>
