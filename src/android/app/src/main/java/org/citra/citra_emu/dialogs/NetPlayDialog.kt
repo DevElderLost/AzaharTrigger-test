@@ -42,8 +42,11 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         super.onCreate(savedInstanceState)
 
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
-        behavior.state = BottomSheetBehavior.STATE_EXPANDED
         behavior.skipCollapsed = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        // Fix: landscape mode agar BottomSheet tidak terpotong
+        if (context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            behavior.peekHeight = context.resources.displayMetrics.heightPixels
+        }
 
         when {
             NetPlayManager.netPlayIsJoined() -> DialogMultiplayerLobbyBinding.inflate(layoutInflater)
@@ -311,8 +314,11 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         val dialog = BottomSheetDialog(activity)
 
         dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
-        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
         dialog.behavior.skipCollapsed = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        // Fix: landscape mode agar BottomSheet tidak terpotong
+        if (context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            dialog.behavior.peekHeight = context.resources.displayMetrics.heightPixels
+        }
 
 
         val binding = DialogMultiplayerRoomBinding.inflate(LayoutInflater.from(activity))
