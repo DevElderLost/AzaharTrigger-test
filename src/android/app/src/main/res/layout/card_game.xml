@@ -14,33 +14,32 @@
     app:cardElevation="2dp">
 
     <!-- cardContents dipertahankan agar binding.cardContents tetap valid -->
+    <!-- paddingTop 100% = rasio 1:1 square tanpa ConstraintLayout -->
     <FrameLayout
         android:id="@+id/card_contents"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content"
+        android:paddingTop="100%">
 
-        <!-- Icon game — rasio 1:1 via paddingTop trick -->
+        <!-- Icon game mengisi seluruh area card secara square -->
         <ImageView
             android:id="@+id/image_game_screen"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:minHeight="80dp"
-            android:adjustViewBounds="true"
+            android:layout_gravity="top"
             android:scaleType="centerCrop"
             android:contentDescription="@string/grid_menu_icon_overlay" />
 
         <!-- Cartridge badge — pojok kanan bawah -->
         <ImageView
             android:id="@+id/image_cartridge"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:layout_gravity="bottom|end"
             android:layout_margin="4dp"
             android:src="@drawable/cartridge"
             android:visibility="gone"
-            android:contentDescription="@null"
-            android:background="@drawable/cartridge_badge_bg"
-            android:padding="2dp" />
+            android:contentDescription="@null" />
 
         <!-- View dummy agar binding lama tidak crash (visibility GONE) -->
         <TextView
