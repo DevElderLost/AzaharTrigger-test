@@ -1134,4 +1134,5 @@
     <string name="emulation_combo3_scale">Combo 3 Scale</string>
     <string name="emulation_combo4_scale">Combo 4 Scale</string>
     <string name="emulation_combo5_scale">Combo 5 Scale</string>
+    <string name="grid_menu_icon_overlay">Game icon</string>
 </resources>
