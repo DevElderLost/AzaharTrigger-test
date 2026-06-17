@@ -149,9 +149,20 @@ class GamesFragment : Fragment() {
         binding.gridGames.apply {
             layoutManager = GridLayoutManager(
                 requireContext(),
-                resources.getInteger(R.integer.game_grid_columns)
+                computeGridColumns(gamesViewModel.games.value.size)
             )
             adapter = this@GamesFragment.gameAdapter
+        }
+
+        // Update spanCount setiap kali daftar game berubah
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                gamesViewModel.games.collectLatest { games ->
+                    val columns = computeGridColumns(games.size)
+                    (binding.gridGames.layoutManager as? GridLayoutManager)
+                        ?.spanCount = columns
+                }
+            }
         }
 
         binding.swipeRefresh.apply {
@@ -245,6 +256,20 @@ class GamesFragment : Fragment() {
         if (_binding != null) {
             binding.gridGames.smoothScrollToPosition(0)
         }
+    }
+
+    /**
+     * Hitung jumlah kolom grid secara dinamis berdasarkan jumlah game.
+     * Lebar layar dibagi lebar minimum per item (96dp).
+     * Hasilnya di-clamp antara MIN dan MAX, lalu tidak melebihi jumlah game itu sendiri.
+     */
+    private fun computeGridColumns(gameCount: Int): Int {
+        val displayMetrics = resources.displayMetrics
+        val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+        val itemMinDp = 72f
+        val autoColumns = (screenWidthDp / itemMinDp).toInt().coerceAtLeast(3)
+        // Jangan lebih banyak kolom dari jumlah game (tapi minimal 1)
+        return if (gameCount > 0) autoColumns.coerceAtMost(gameCount) else autoColumns
     }
 
     private fun setInsets() =
