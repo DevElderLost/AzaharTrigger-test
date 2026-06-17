@@ -266,7 +266,7 @@ class GamesFragment : Fragment() {
     private fun computeGridColumns(gameCount: Int): Int {
         val displayMetrics = resources.displayMetrics
         val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
-        val itemMinDp = 96f
+        val itemMinDp = 72f
         val autoColumns = (screenWidthDp / itemMinDp).toInt().coerceAtLeast(3)
         // Jangan lebih banyak kolom dari jumlah game (tapi minimal 1)
         return if (gameCount > 0) autoColumns.coerceAtMost(gameCount) else autoColumns

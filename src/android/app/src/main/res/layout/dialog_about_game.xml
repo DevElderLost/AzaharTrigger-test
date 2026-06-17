@@ -39,17 +39,20 @@
                 android:layout_marginStart="16dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintHeight_min="100dp"
+                app:layout_constraintHeight_max="120dp"
                 app:layout_constraintStart_toEndOf="@id/game_icon"
                 app:layout_constraintTop_toTopOf="parent">
 
                 <TextView
                     android:id="@+id/about_game_title"
                     style="?attr/textAppearanceTitleMedium"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textAlignment="viewStart"
-                    android:textSize="15sp"
+                    android:textSize="13sp"
                     android:textStyle="bold"
+                    android:maxLines="2"
+                    android:ellipsize="end"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     tools:text="Application Title" />
