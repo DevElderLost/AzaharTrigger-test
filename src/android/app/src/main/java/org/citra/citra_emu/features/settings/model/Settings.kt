@@ -230,6 +230,25 @@ class Settings {
         const val PREF_SHOW_HOME_APPS = "ShowHomeApps"
         const val PREF_STATIC_THEME_COLOR = "StaticThemeColor"
 
+        // ── Combo Button preference keys ──────────────────────────────────
+        const val PREF_COMBO_1_ENABLED = "combo_button_1_enabled"
+        const val PREF_COMBO_2_ENABLED = "combo_button_2_enabled"
+        const val PREF_COMBO_3_ENABLED = "combo_button_3_enabled"
+        const val PREF_COMBO_4_ENABLED = "combo_button_4_enabled"
+        const val PREF_COMBO_5_ENABLED = "combo_button_5_enabled"
+
+        const val PREF_COMBO_1_LABEL   = "combo_button_1_label"
+        const val PREF_COMBO_2_LABEL   = "combo_button_2_label"
+        const val PREF_COMBO_3_LABEL   = "combo_button_3_label"
+        const val PREF_COMBO_4_LABEL   = "combo_button_4_label"
+        const val PREF_COMBO_5_LABEL   = "combo_button_5_label"
+
+        const val PREF_COMBO_1_BUTTONS = "combo_button_1_buttons"
+        const val PREF_COMBO_2_BUTTONS = "combo_button_2_buttons"
+        const val PREF_COMBO_3_BUTTONS = "combo_button_3_buttons"
+        const val PREF_COMBO_4_BUTTONS = "combo_button_4_buttons"
+        const val PREF_COMBO_5_BUTTONS = "combo_button_5_buttons"
+
         private val configFileSectionsMap: MutableMap<String, List<String>> = HashMap()
 
         init {

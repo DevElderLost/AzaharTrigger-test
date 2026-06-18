@@ -14,6 +14,9 @@
         android:name="org.citra.citra_emu.fragments.HomeSettingsFragment"
         android:label="HomeSettingsFragment" >
         <action
+            android:id="@+id/action_homeSettingsFragment_to_comboButtonSettingsFragment"
+            app:destination="@id/comboButtonSettingsFragment" />
+        <action
             android:id="@+id/action_homeSettingsFragment_to_aboutFragment"
             app:destination="@id/aboutFragment" />
         <action
@@ -93,5 +96,10 @@
         android:id="@+id/driverManagerFragment"
         android:name="org.citra.citra_emu.fragments.DriverManagerFragment"
         android:label="DriverManagerFragment" />
+
+    <fragment
+        android:id="@+id/comboButtonSettingsFragment"
+        android:name="org.citra.citra_emu.features.settings.ui.ComboButtonSettingsFragment"
+        android:label="Combo Buttons" />
 
 </navigation>

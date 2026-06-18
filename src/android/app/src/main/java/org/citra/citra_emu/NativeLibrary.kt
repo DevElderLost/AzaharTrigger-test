@@ -28,6 +28,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.lang.ref.WeakReference
 import java.util.Date
 import org.citra.citra_emu.activities.EmulationActivity
+import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.model.Game
 import org.citra.citra_emu.utils.BuildUtil
 import org.citra.citra_emu.utils.FileUtil
@@ -35,6 +36,9 @@ import org.citra.citra_emu.utils.GraphicsUtil
 import org.citra.citra_emu.utils.Log
 import org.citra.citra_emu.utils.RemovableStorageHelper
 import org.citra.citra_emu.viewmodel.CompressProgressDialogViewModel
+import org.citra.citra_emu.utils.NetPlayManager
+import java.lang.ref.WeakReference
+import java.util.Date
 
 /**
  * Class which contains methods that interact
@@ -705,6 +709,26 @@ object NativeLibrary {
 
     @Keep
     @JvmStatic
+    fun addNetPlayMessage(type: Int, message: String) {
+        val emulationActivity = sEmulationActivity.get()
+        if (emulationActivity != null) {
+            emulationActivity.addNetPlayMessages(type, message)
+        }
+        else {
+            NetPlayManager.addNetPlayMessage(type, message)
+        }
+    }
+
+    @Keep
+    @JvmStatic
+    fun clearChat() {
+        NetPlayManager.clearChat()
+    }
+
+    external fun initMultiplayer()
+
+    @Keep
+    @JvmStatic
     fun createFile(directory: String, filename: String): Boolean =
         if (FileUtil.isNativePath(directory)) {
             CitraApplication.documentsTree.createFile(directory, filename)
@@ -1009,6 +1033,13 @@ object NativeLibrary {
         const val BUTTON_GPIO14 = 782
         const val BUTTON_SWAP = 800
         const val BUTTON_TURBO = 801
+
+        // Virtual IDs for Combo Buttons (handled in InputOverlay, NOT sent to core)
+        const val BUTTON_COMBO_1 = 900
+        const val BUTTON_COMBO_2 = 901
+        const val BUTTON_COMBO_3 = 902
+        const val BUTTON_COMBO_4 = 903
+        const val BUTTON_COMBO_5 = 904
     }
 
     /**

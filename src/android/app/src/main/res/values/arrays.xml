@@ -188,7 +188,12 @@
         <item>@string/button_home</item>
         <item>@string/button_swap</item>
         <item>@string/button_turbo</item>
-    </string-array>
+            <item>Combo 1</item>
+        <item>Combo 2</item>
+        <item>Combo 3</item>
+        <item>Combo 4</item>
+        <item>Combo 5</item>
+</string-array>
 
     <string-array name="cameraImageSourceNames">
         <item>@string/blank</item>
