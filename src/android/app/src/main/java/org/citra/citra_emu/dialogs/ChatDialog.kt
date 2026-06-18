@@ -44,10 +44,9 @@ class ChatDialog(context: Context) : BottomSheetDialog(context) {
         setupRecyclerView()
 
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
-        behavior.state = BottomSheetBehavior.STATE_EXPANDED
         behavior.skipCollapsed =
             context.resources.configuration.orientation ==
-                Configuration.ORIENTATION_LANDSCAPE
+            Configuration.ORIENTATION_LANDSCAPE
 
         handler.post {
             chatAdapter.notifyDataSetChanged()

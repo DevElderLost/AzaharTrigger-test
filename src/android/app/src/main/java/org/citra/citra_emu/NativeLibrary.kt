@@ -29,7 +29,6 @@ import java.lang.ref.WeakReference
 import org.citra.citra_emu.activities.EmulationActivity
 import org.citra.citra_emu.model.Game
 import org.citra.citra_emu.utils.BuildUtil
-import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.utils.FileUtil
 import org.citra.citra_emu.utils.GraphicsUtil
 import org.citra.citra_emu.utils.Log

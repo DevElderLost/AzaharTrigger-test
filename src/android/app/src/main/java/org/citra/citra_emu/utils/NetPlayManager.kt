@@ -8,11 +8,9 @@ import android.app.Activity
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.text.format.Formatter
 import android.widget.Toast
 import androidx.preference.PreferenceManager
 import org.citra.citra_emu.CitraApplication
@@ -222,52 +220,79 @@ object NetPlayManager {
         return when (type) {
             NetPlayStatus.NETWORK_ERROR ->
                 context.getString(R.string.multiplayer_network_error)
+
             NetPlayStatus.LOST_CONNECTION ->
                 context.getString(R.string.multiplayer_lost_connection)
+
             NetPlayStatus.NAME_COLLISION ->
                 context.getString(R.string.multiplayer_name_collision)
+
             NetPlayStatus.MAC_COLLISION ->
                 context.getString(R.string.multiplayer_mac_collision)
+
             NetPlayStatus.CONSOLE_ID_COLLISION ->
                 context.getString(R.string.multiplayer_console_id_collision)
+
             NetPlayStatus.WRONG_VERSION ->
                 context.getString(R.string.multiplayer_wrong_version)
+
             NetPlayStatus.WRONG_PASSWORD ->
                 context.getString(R.string.multiplayer_wrong_password)
+
             NetPlayStatus.COULD_NOT_CONNECT ->
                 context.getString(R.string.multiplayer_could_not_connect)
+
             NetPlayStatus.ROOM_IS_FULL ->
                 context.getString(R.string.multiplayer_room_is_full)
+
             NetPlayStatus.HOST_BANNED ->
                 context.getString(R.string.multiplayer_host_banned)
+
             NetPlayStatus.PERMISSION_DENIED ->
                 context.getString(R.string.multiplayer_permission_denied)
+
             NetPlayStatus.NO_SUCH_USER ->
                 context.getString(R.string.multiplayer_no_such_user)
+
             NetPlayStatus.ALREADY_IN_ROOM ->
                 context.getString(R.string.multiplayer_already_in_room)
+
             NetPlayStatus.CREATE_ROOM_ERROR ->
                 context.getString(R.string.multiplayer_create_room_error)
+
             NetPlayStatus.HOST_KICKED ->
                 context.getString(R.string.multiplayer_host_kicked)
+
             NetPlayStatus.UNKNOWN_ERROR ->
                 context.getString(R.string.multiplayer_unknown_error)
+
             NetPlayStatus.ROOM_UNINITIALIZED ->
                 context.getString(R.string.multiplayer_room_uninitialized)
+
             NetPlayStatus.ROOM_IDLE -> context.getString(R.string.multiplayer_room_idle)
+
             NetPlayStatus.ROOM_JOINING -> context.getString(R.string.multiplayer_room_joining)
+
             NetPlayStatus.ROOM_JOINED -> context.getString(R.string.multiplayer_room_joined)
-            NetPlayStatus.ROOM_MODERATOR -> context.getString(R.string.multiplayer_room_moderator)
+
+            NetPlayStatus.ROOM_MODERATOR ->
+                context.getString(R.string.multiplayer_room_moderator)
+
             NetPlayStatus.MEMBER_JOIN ->
                 context.getString(R.string.multiplayer_member_join, msg)
+
             NetPlayStatus.MEMBER_LEAVE ->
                 context.getString(R.string.multiplayer_member_leave, msg)
+
             NetPlayStatus.MEMBER_KICKED ->
                 context.getString(R.string.multiplayer_member_kicked, msg)
+
             NetPlayStatus.MEMBER_BANNED ->
                 context.getString(R.string.multiplayer_member_banned, msg)
+
             NetPlayStatus.ADDRESS_UNBANNED ->
                 context.getString(R.string.multiplayer_address_unbanned)
+
             NetPlayStatus.CHAT_MESSAGE -> msg
             else -> ""
         }
