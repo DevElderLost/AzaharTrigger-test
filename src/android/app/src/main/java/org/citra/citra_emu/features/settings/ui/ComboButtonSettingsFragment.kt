@@ -55,7 +55,9 @@ class ComboButtonSettingsFragment : Fragment() {
 
         for (slot in 1..ComboButtonManager.COMBO_COUNT) {
             val cardBinding = ItemComboButtonBinding.inflate(
-                layoutInflater, binding.comboContainer, true
+                layoutInflater,
+                binding.comboContainer,
+                true
             )
             bindSlot(cardBinding, slot)
         }
@@ -104,10 +106,10 @@ class ComboButtonSettingsFragment : Fragment() {
 
     private fun showPickerDialog(slot: Int, onDone: () -> Unit) {
         val assignable = ComboButtonManager.assignableButtons
-        val names      = assignable.map { it.first }.toTypedArray()
-        val ids        = assignable.map { it.second }
-        val selected   = ComboButtonManager.getButtonsForSlot(slot).toMutableSet()
-        val checked    = BooleanArray(names.size) { i -> ids[i] in selected }
+        val names = assignable.map { it.first }.toTypedArray()
+        val ids = assignable.map { it.second }
+        val selected = ComboButtonManager.getButtonsForSlot(slot).toMutableSet()
+        val checked = BooleanArray(names.size) { i -> ids[i] in selected }
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Assign buttons — Combo $slot")

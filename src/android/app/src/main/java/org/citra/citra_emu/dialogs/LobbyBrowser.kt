@@ -22,12 +22,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import info.debatty.java.stringsimilarity.Jaccard
 import info.debatty.java.stringsimilarity.JaroWinkler
+import java.util.Locale
 import org.citra.citra_emu.R
 import org.citra.citra_emu.databinding.DialogLobbyBrowserBinding
 import org.citra.citra_emu.databinding.ItemLobbyRoomBinding
-import org.citra.citra_emu.utils.CompatUtils
 import org.citra.citra_emu.utils.NetPlayManager
-import java.util.Locale
 
 class LobbyBrowser(context: Context) : BottomSheetDialog(context) {
     private lateinit var binding: DialogLobbyBrowserBinding
@@ -75,7 +74,6 @@ class LobbyBrowser(context: Context) : BottomSheetDialog(context) {
 
     private fun setupSearchBar() {
         binding.chipGroup.setOnCheckedStateChangeListener { _, _ -> adapter.filterAndSearch() }
-
 
         binding.searchText.doOnTextChanged { text: CharSequence?, _: Int, _: Int, _: Int ->
             if (text.toString().isNotEmpty()) {
@@ -224,19 +222,18 @@ class LobbyBrowser(context: Context) : BottomSheetDialog(context) {
             val searchTerm = binding.searchText.text.toString().lowercase(Locale.getDefault())
             val searchAlgorithm = if (searchTerm.length > 1) Jaccard(2) else JaroWinkler()
             val sortedList: List<NetPlayManager.RoomInfo> = filteredList.mapNotNull { room ->
-                    val roomName = room.name.lowercase(Locale.getDefault())
+                val roomName = room.name.lowercase(Locale.getDefault())
 
-                    val score = searchAlgorithm.similarity(roomName, searchTerm)
-                    if (score > 0.03) {
-                        ScoreItem(score, room)
-                    } else {
-                        null
-                    }
-                }.sortedByDescending { it ->
-                    it.score
-                }.map { it.item }
+                val score = searchAlgorithm.similarity(roomName, searchTerm)
+                if (score > 0.03) {
+                    ScoreItem(score, room)
+                } else {
+                    null
+                }
+            }.sortedByDescending { it ->
+                it.score
+            }.map { it.item }
             adapter.updateRooms(sortedList)
-
         }
     }
 

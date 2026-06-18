@@ -237,11 +237,11 @@ class Settings {
         const val PREF_COMBO_4_ENABLED = "combo_button_4_enabled"
         const val PREF_COMBO_5_ENABLED = "combo_button_5_enabled"
 
-        const val PREF_COMBO_1_LABEL   = "combo_button_1_label"
-        const val PREF_COMBO_2_LABEL   = "combo_button_2_label"
-        const val PREF_COMBO_3_LABEL   = "combo_button_3_label"
-        const val PREF_COMBO_4_LABEL   = "combo_button_4_label"
-        const val PREF_COMBO_5_LABEL   = "combo_button_5_label"
+        const val PREF_COMBO_1_LABEL = "combo_button_1_label"
+        const val PREF_COMBO_2_LABEL = "combo_button_2_label"
+        const val PREF_COMBO_3_LABEL = "combo_button_3_label"
+        const val PREF_COMBO_4_LABEL = "combo_button_4_label"
+        const val PREF_COMBO_5_LABEL = "combo_button_5_label"
 
         const val PREF_COMBO_1_BUTTONS = "combo_button_1_buttons"
         const val PREF_COMBO_2_BUTTONS = "combo_button_2_buttons"

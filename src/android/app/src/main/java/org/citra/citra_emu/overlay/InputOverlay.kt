@@ -28,9 +28,6 @@ import org.citra.citra_emu.NativeLibrary
 import org.citra.citra_emu.R
 import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.utils.TurboHelper
-import org.citra.citra_emu.overlay.ComboButtonManager
-import java.lang.NullPointerException
-import kotlin.math.min
 
 /**
  * Draws the interactive input overlay on top of the
@@ -183,7 +180,9 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) :
                         button.status == NativeLibrary.ButtonState.PRESSED
                     ) {
                         swapScreen()
-                    } else if (button.id == NativeLibrary.ButtonType.BUTTON_TURBO && button.status == NativeLibrary.ButtonState.PRESSED) {
+                    } else if (button.id == NativeLibrary.ButtonType.BUTTON_TURBO &&
+                        button.status == NativeLibrary.ButtonState.PRESSED
+                    ) {
                         TurboHelper.toggleTurbo(true)
                     }
 
@@ -606,21 +605,21 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) :
             ComboButtonManager.COMBO_BUTTON_2,
             ComboButtonManager.COMBO_BUTTON_3,
             ComboButtonManager.COMBO_BUTTON_4,
-            ComboButtonManager.COMBO_BUTTON_5,
+            ComboButtonManager.COMBO_BUTTON_5
         )
         val comboDefaultDrawables = intArrayOf(
             R.drawable.combo_button_1,
             R.drawable.combo_button_2,
             R.drawable.combo_button_3,
             R.drawable.combo_button_4,
-            R.drawable.combo_button_5,
+            R.drawable.combo_button_5
         )
         val comboPressedDrawables = intArrayOf(
             R.drawable.combo_button_1_pressed,
             R.drawable.combo_button_2_pressed,
             R.drawable.combo_button_3_pressed,
             R.drawable.combo_button_4_pressed,
-            R.drawable.combo_button_5_pressed,
+            R.drawable.combo_button_5_pressed
         )
         for (i in comboIds.indices) {
             val toggleKey = "buttonToggle${16 + i}"
@@ -691,15 +690,12 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) :
 
         // Set posisi default combo button jika belum pernah di-set
         // (user yang install sebelum fitur combo ditambahkan tidak punya key ini)
-        val combo1X = preferences.getFloat(
-            "${ComboButtonManager.COMBO_BUTTON_1}-X", -1f
-        )
+        val combo1X = preferences.getFloat("${ComboButtonManager.COMBO_BUTTON_1}-X", -1f)
         if (combo1X == -1f) {
             defaultOverlayLandscape()
         }
-        val combo1PortraitX = preferences.getFloat(
-            "${ComboButtonManager.COMBO_BUTTON_1}-Portrait-X", -1f
-        )
+        val combo1PortraitX =
+            preferences.getFloat("${ComboButtonManager.COMBO_BUTTON_1}-Portrait-X", -1f)
         if (combo1PortraitX == -1f) {
             defaultOverlayPortrait()
         }

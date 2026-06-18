@@ -22,7 +22,7 @@ import org.citra.citra_emu.NativeLibrary
  */
 object ComboButtonManager {
 
-    const val COMBO_COUNT          = 5
+    const val COMBO_COUNT = 5
     const val MAX_BUTTONS_PER_COMBO = 4
 
     // Virtual overlay button IDs (900–904, free in ButtonType range)
@@ -33,13 +33,16 @@ object ComboButtonManager {
     const val COMBO_BUTTON_5 = 904
 
     val COMBO_IDS = intArrayOf(
-        COMBO_BUTTON_1, COMBO_BUTTON_2, COMBO_BUTTON_3,
-        COMBO_BUTTON_4, COMBO_BUTTON_5,
+        COMBO_BUTTON_1,
+        COMBO_BUTTON_2,
+        COMBO_BUTTON_3,
+        COMBO_BUTTON_4,
+        COMBO_BUTTON_5
     )
 
     // SharedPrefs key helpers
     fun enabledKey(slot: Int) = "combo_button_${slot}_enabled"
-    fun labelKey(slot: Int)   = "combo_button_${slot}_label"
+    fun labelKey(slot: Int) = "combo_button_${slot}_label"
     fun buttonsKey(slot: Int) = "combo_button_${slot}_buttons"
 
     private val preferences: SharedPreferences
@@ -67,14 +70,16 @@ object ComboButtonManager {
     /** Persists button assignments for a slot (1-based). */
     fun setButtonsForSlot(slot: Int, buttonIds: List<Int>) {
         preferences.edit()
-            .putString(buttonsKey(slot), buttonIds.distinct().take(MAX_BUTTONS_PER_COMBO).joinToString(","))
+            .putString(
+                buttonsKey(slot),
+                buttonIds.distinct().take(MAX_BUTTONS_PER_COMBO).joinToString(",")
+            )
             .apply()
     }
 
     /** Display label; falls back to auto-generated "A+B" style. */
-    fun getLabelForSlot(slot: Int): String =
-        preferences.getString(labelKey(slot), "")
-            ?.takeIf { it.isNotBlank() } ?: autoLabel(slot)
+    fun getLabelForSlot(slot: Int): String = preferences.getString(labelKey(slot), "")
+        ?.takeIf { it.isNotBlank() } ?: autoLabel(slot)
 
     fun setLabelForSlot(slot: Int, label: String?) {
         preferences.edit().putString(labelKey(slot), label ?: "").apply()
@@ -105,39 +110,39 @@ object ComboButtonManager {
     }
 
     fun buttonShortName(id: Int): String = when (id) {
-        NativeLibrary.ButtonType.BUTTON_A      -> "A"
-        NativeLibrary.ButtonType.BUTTON_B      -> "B"
-        NativeLibrary.ButtonType.BUTTON_X      -> "X"
-        NativeLibrary.ButtonType.BUTTON_Y      -> "Y"
-        NativeLibrary.ButtonType.BUTTON_START  -> "Start"
+        NativeLibrary.ButtonType.BUTTON_A -> "A"
+        NativeLibrary.ButtonType.BUTTON_B -> "B"
+        NativeLibrary.ButtonType.BUTTON_X -> "X"
+        NativeLibrary.ButtonType.BUTTON_Y -> "Y"
+        NativeLibrary.ButtonType.BUTTON_START -> "Start"
         NativeLibrary.ButtonType.BUTTON_SELECT -> "Select"
-        NativeLibrary.ButtonType.BUTTON_HOME   -> "Home"
-        NativeLibrary.ButtonType.TRIGGER_L     -> "L"
-        NativeLibrary.ButtonType.TRIGGER_R     -> "R"
-        NativeLibrary.ButtonType.BUTTON_ZL     -> "ZL"
-        NativeLibrary.ButtonType.BUTTON_ZR     -> "ZR"
-        NativeLibrary.ButtonType.DPAD_UP       -> "↑"
-        NativeLibrary.ButtonType.DPAD_DOWN     -> "↓"
-        NativeLibrary.ButtonType.DPAD_LEFT     -> "←"
-        NativeLibrary.ButtonType.DPAD_RIGHT    -> "→"
-        else                                   -> "[$id]"
+        NativeLibrary.ButtonType.BUTTON_HOME -> "Home"
+        NativeLibrary.ButtonType.TRIGGER_L -> "L"
+        NativeLibrary.ButtonType.TRIGGER_R -> "R"
+        NativeLibrary.ButtonType.BUTTON_ZL -> "ZL"
+        NativeLibrary.ButtonType.BUTTON_ZR -> "ZR"
+        NativeLibrary.ButtonType.DPAD_UP -> "↑"
+        NativeLibrary.ButtonType.DPAD_DOWN -> "↓"
+        NativeLibrary.ButtonType.DPAD_LEFT -> "←"
+        NativeLibrary.ButtonType.DPAD_RIGHT -> "→"
+        else -> "[$id]"
     }
 
     /** All buttons available for assignment (name → ID). */
     val assignableButtons: List<Pair<String, Int>> = listOf(
-        "A"       to NativeLibrary.ButtonType.BUTTON_A,
-        "B"       to NativeLibrary.ButtonType.BUTTON_B,
-        "X"       to NativeLibrary.ButtonType.BUTTON_X,
-        "Y"       to NativeLibrary.ButtonType.BUTTON_Y,
-        "L"       to NativeLibrary.ButtonType.TRIGGER_L,
-        "R"       to NativeLibrary.ButtonType.TRIGGER_R,
-        "ZL"      to NativeLibrary.ButtonType.BUTTON_ZL,
-        "ZR"      to NativeLibrary.ButtonType.BUTTON_ZR,
-        "Start"   to NativeLibrary.ButtonType.BUTTON_START,
-        "Select"  to NativeLibrary.ButtonType.BUTTON_SELECT,
-        "D-Up"    to NativeLibrary.ButtonType.DPAD_UP,
-        "D-Down"  to NativeLibrary.ButtonType.DPAD_DOWN,
-        "D-Left"  to NativeLibrary.ButtonType.DPAD_LEFT,
-        "D-Right" to NativeLibrary.ButtonType.DPAD_RIGHT,
+        "A" to NativeLibrary.ButtonType.BUTTON_A,
+        "B" to NativeLibrary.ButtonType.BUTTON_B,
+        "X" to NativeLibrary.ButtonType.BUTTON_X,
+        "Y" to NativeLibrary.ButtonType.BUTTON_Y,
+        "L" to NativeLibrary.ButtonType.TRIGGER_L,
+        "R" to NativeLibrary.ButtonType.TRIGGER_R,
+        "ZL" to NativeLibrary.ButtonType.BUTTON_ZL,
+        "ZR" to NativeLibrary.ButtonType.BUTTON_ZR,
+        "Start" to NativeLibrary.ButtonType.BUTTON_START,
+        "Select" to NativeLibrary.ButtonType.BUTTON_SELECT,
+        "D-Up" to NativeLibrary.ButtonType.DPAD_UP,
+        "D-Down" to NativeLibrary.ButtonType.DPAD_DOWN,
+        "D-Left" to NativeLibrary.ButtonType.DPAD_LEFT,
+        "D-Right" to NativeLibrary.ButtonType.DPAD_RIGHT
     )
 }

@@ -26,19 +26,16 @@ import androidx.fragment.app.DialogFragment
 import androidx.preference.PreferenceManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.lang.ref.WeakReference
-import java.util.Date
 import org.citra.citra_emu.activities.EmulationActivity
-import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.model.Game
 import org.citra.citra_emu.utils.BuildUtil
+import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.utils.FileUtil
 import org.citra.citra_emu.utils.GraphicsUtil
 import org.citra.citra_emu.utils.Log
+import org.citra.citra_emu.utils.NetPlayManager
 import org.citra.citra_emu.utils.RemovableStorageHelper
 import org.citra.citra_emu.viewmodel.CompressProgressDialogViewModel
-import org.citra.citra_emu.utils.NetPlayManager
-import java.lang.ref.WeakReference
-import java.util.Date
 
 /**
  * Class which contains methods that interact
@@ -713,8 +710,7 @@ object NativeLibrary {
         val emulationActivity = sEmulationActivity.get()
         if (emulationActivity != null) {
             emulationActivity.addNetPlayMessages(type, message)
-        }
-        else {
+        } else {
             NetPlayManager.addNetPlayMessage(type, message)
         }
     }

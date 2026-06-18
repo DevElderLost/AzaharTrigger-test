@@ -868,27 +868,42 @@ class EmulationFragment :
                 }
 
                 R.id.menu_emulation_adjust_scale_combo_1 -> {
-                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_1)
+                    showAdjustScaleDialog(
+                        "controlScale-" +
+                            org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_1
+                    )
                     true
                 }
 
                 R.id.menu_emulation_adjust_scale_combo_2 -> {
-                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_2)
+                    showAdjustScaleDialog(
+                        "controlScale-" +
+                            org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_2
+                    )
                     true
                 }
 
                 R.id.menu_emulation_adjust_scale_combo_3 -> {
-                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_3)
+                    showAdjustScaleDialog(
+                        "controlScale-" +
+                            org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_3
+                    )
                     true
                 }
 
                 R.id.menu_emulation_adjust_scale_combo_4 -> {
-                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_4)
+                    showAdjustScaleDialog(
+                        "controlScale-" +
+                            org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_4
+                    )
                     true
                 }
 
                 R.id.menu_emulation_adjust_scale_combo_5 -> {
-                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_5)
+                    showAdjustScaleDialog(
+                        "controlScale-" +
+                            org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_5
+                    )
                     true
                 }
 
@@ -1292,7 +1307,7 @@ class EmulationFragment :
                 editor.putBoolean("buttonToggle$indexSelected", isChecked)
                 // Sync combo enabled state ke ComboButtonManager
                 if (indexSelected in 16..20) {
-                    val slot = indexSelected - 15  // 16->1, 17->2, ...
+                    val slot = indexSelected - 15 // 16->1, 17->2, ...
                     org.citra.citra_emu.overlay.ComboButtonManager.setEnabled(slot, isChecked)
                 }
             }
