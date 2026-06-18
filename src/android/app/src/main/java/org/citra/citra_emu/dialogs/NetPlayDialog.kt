@@ -104,12 +104,7 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         }
     }
 
-    data class NetPlayItems(
-        val option: Int,
-        val name: String,
-        val type: Int,
-        val id: Int = 0
-    ) {
+    data class NetPlayItems(val option: Int, val name: String, val type: Int, val id: Int = 0) {
         companion object {
             const val MULTIPLAYER_ROOM_TEXT = 1
             const val MULTIPLAYER_ROOM_MEMBER = 2
@@ -509,10 +504,8 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         dialog.show()
     }
 
-    private class BanListAdapter(
-        banList: List<String>,
-        private val onUnban: (String) -> Unit
-    ) : RecyclerView.Adapter<BanListAdapter.ViewHolder>() {
+    private class BanListAdapter(banList: List<String>, private val onUnban: (String) -> Unit) :
+        RecyclerView.Adapter<BanListAdapter.ViewHolder>() {
 
         private val usernameBans = banList.filter { !it.contains(".") }.toMutableList()
         private val ipBans = banList.filter { it.contains(".") }.toMutableList()
