@@ -47,8 +47,8 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
             Configuration.ORIENTATION_LANDSCAPE
 
         when {
-            NetPlayManager.netPlayIsJoined() -> DialogMultiplayerLobbyBinding.inflate(layoutInflater)
-                .apply {
+            NetPlayManager.netPlayIsJoined() ->
+                DialogMultiplayerLobbyBinding.inflate(layoutInflater).apply {
                     setContentView(root)
                     adapter = NetPlayAdapter()
                     listMultiplayer.layoutManager = LinearLayoutManager(context)
@@ -70,6 +70,7 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                         showModerationDialog()
                     }
                 }
+
             else -> {
                 DialogMultiplayerConnectBinding.inflate(layoutInflater).apply {
                     setContentView(root)
@@ -107,7 +108,7 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         val option: Int,
         val name: String,
         val type: Int,
-        val id: Int = 0,
+        val id: Int = 0
     ) {
         companion object {
             const val MULTIPLAYER_ROOM_TEXT = 1
@@ -124,7 +125,8 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
         val netPlayItems = mutableListOf<NetPlayItems>()
 
         abstract inner class NetPlayViewHolder(itemView: View) :
-            RecyclerView.ViewHolder(itemView), View.OnClickListener {
+            RecyclerView.ViewHolder(itemView),
+            View.OnClickListener {
             init {
                 itemView.setOnClickListener(this)
             }
@@ -219,7 +221,11 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                     )
                 )
                 netPlayItems.add(
-                    NetPlayItems(NetPlayItems.MULTIPLAYER_SEPARATOR, "", NetPlayItems.TYPE_SEPARATOR)
+                    NetPlayItems(
+                        NetPlayItems.MULTIPLAYER_SEPARATOR,
+                        "",
+                        NetPlayItems.TYPE_SEPARATOR
+                    )
                 )
                 for (i in 1 until infos.size) {
                     netPlayItems.add(
@@ -505,7 +511,7 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
 
     private class BanListAdapter(
         banList: List<String>,
-        private val onUnban: (String) -> Unit,
+        private val onUnban: (String) -> Unit
     ) : RecyclerView.Adapter<BanListAdapter.ViewHolder>() {
 
         private val usernameBans = banList.filter { !it.contains(".") }.toMutableList()

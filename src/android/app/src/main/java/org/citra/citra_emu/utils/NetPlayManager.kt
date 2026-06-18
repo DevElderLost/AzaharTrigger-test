@@ -13,10 +13,10 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.preference.PreferenceManager
+import java.net.Inet4Address
 import org.citra.citra_emu.CitraApplication
 import org.citra.citra_emu.R
 import org.citra.citra_emu.dialogs.ChatMessage
-import java.net.Inet4Address
 
 object NetPlayManager {
     external fun netPlayCreateRoom(
@@ -216,8 +216,8 @@ object NetPlayManager {
         adapterRefreshListener?.invoke(type, msg)
     }
 
-    private fun formatNetPlayStatus(context: Context, type: Int, msg: String): String {
-        return when (type) {
+    private fun formatNetPlayStatus(context: Context, type: Int, msg: String): String =
+        when (type) {
             NetPlayStatus.NETWORK_ERROR ->
                 context.getString(R.string.multiplayer_network_error)
 
@@ -294,9 +294,9 @@ object NetPlayManager {
                 context.getString(R.string.multiplayer_address_unbanned)
 
             NetPlayStatus.CHAT_MESSAGE -> msg
+
             else -> ""
         }
-    }
 
     fun isConnectedToWifi(activity: Activity): Boolean {
         val connectivityManager = activity.getSystemService(ConnectivityManager::class.java)
