@@ -191,7 +191,7 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) :
                         ComboButtonManager.dispatchComboEvent(button.id, button.status)
                     } else {
                         NativeLibrary.onGamePadEvent(
-                            NativeLibrary.TouchScreenDevice,
+                            NativeLibrary.TOUCHSCREEN_DEVICE,
                             button.id,
                             button.status
                         )

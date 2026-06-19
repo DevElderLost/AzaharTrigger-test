@@ -26,6 +26,7 @@ import androidx.fragment.app.DialogFragment
 import androidx.preference.PreferenceManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.lang.ref.WeakReference
+import java.util.Date
 import org.citra.citra_emu.activities.EmulationActivity
 import org.citra.citra_emu.model.Game
 import org.citra.citra_emu.utils.BuildUtil
