@@ -62,13 +62,15 @@ import org.citra.citra_emu.utils.CitraDirectoryUtils
 import org.citra.citra_emu.utils.DirectoryInitialization
 import org.citra.citra_emu.utils.FileBrowserHelper
 import org.citra.citra_emu.utils.InsetsHelper
-import org.citra.citra_emu.utils.RefreshRateUtil
 import org.citra.citra_emu.utils.PermissionsHandler
+import org.citra.citra_emu.utils.RefreshRateUtil
 import org.citra.citra_emu.utils.ThemeUtil
 import org.citra.citra_emu.viewmodel.GamesViewModel
 import org.citra.citra_emu.viewmodel.HomeViewModel
 
-class MainActivity : AppCompatActivity(), ThemeProvider {
+class MainActivity :
+    AppCompatActivity(),
+    ThemeProvider {
     private lateinit var binding: ActivityMainBinding
 
     private val homeViewModel: HomeViewModel by viewModels()
@@ -88,18 +90,18 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         CitraDirectoryUtils.attemptAutomaticUpdateDirectory()
         splashScreen.setKeepOnScreenCondition {
             !DirectoryInitialization.areCitraDirectoriesReady() &&
-                    PermissionsHandler.hasWriteAccess(this) &&
-                    !CitraDirectoryUtils.needToUpdateManually()
+                PermissionsHandler.hasWriteAccess(this) &&
+                !CitraDirectoryUtils.needToUpdateManually()
         }
-
 
         if (PermissionsHandler.hasWriteAccess(applicationContext) &&
             DirectoryInitialization.areCitraDirectoriesReady() &&
-            !CitraDirectoryUtils.needToUpdateManually()) {
+            !CitraDirectoryUtils.needToUpdateManually()
+        ) {
             settingsViewModel.settings.loadSettings()
         }
 
-        ThemeUtil.ThemeChangeListener(this)
+        ThemeUtil.themeChangeListener(this)
         ThemeUtil.setTheme(this)
         super.onCreate(savedInstanceState)
         NativeLibrary.initMultiplayer()
@@ -154,7 +156,9 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
 
                     gamesViewModel.setShouldScrollToTop(true)
                 }
+
                 R.id.searchFragment -> gamesViewModel.setSearchFocused(true)
+
                 R.id.homeSettingsFragment -> SettingsActivity.launch(
                     this,
                     SettingsFile.FILE_NAME_CONFIG,
@@ -236,7 +240,11 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
                 GrantMissingFilesystemPermissionFragment.newInstance()
                     .show(supportFragmentManager, GrantMissingFilesystemPermissionFragment.TAG)
 
-            if (supportFragmentManager.findFragmentByTag(GrantMissingFilesystemPermissionFragment.TAG) == null) {
+            if (supportFragmentManager.findFragmentByTag(
+                    GrantMissingFilesystemPermissionFragment.TAG
+                ) ==
+                null
+            ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     if (!Environment.isExternalStorageManager()) {
                         requestMissingFilesystemPermission()
@@ -263,12 +271,14 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
             return
         } else if (CitraDirectoryUtils.needToUpdateManually()) {
             UpdateUserDirectoryDialogFragment.newInstance(this)
-                .show(supportFragmentManager,UpdateUserDirectoryDialogFragment.TAG)
+                .show(supportFragmentManager, UpdateUserDirectoryDialogFragment.TAG)
             return
         }
 
         if (!BuildUtil.isGooglePlayBuild) {
-            if (supportFragmentManager.findFragmentByTag(SelectUserDirectoryDialogFragment.TAG) == null) {
+            if (supportFragmentManager.findFragmentByTag(SelectUserDirectoryDialogFragment.TAG) ==
+                null
+            ) {
                 if (NativeLibrary.getUserDirectory() == "") {
                     SelectUserDirectoryDialogFragment.newInstance(this)
                         .show(supportFragmentManager, SelectUserDirectoryDialogFragment.TAG)
@@ -372,28 +382,29 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
         }.start()
     }
 
-    private fun setInsets() =
-        ViewCompat.setOnApplyWindowInsetsListener(
-            binding.root
-        ) { _: View, windowInsets: WindowInsetsCompat ->
-            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            val mlpStatusShade = binding.statusBarShade.layoutParams as MarginLayoutParams
-            mlpStatusShade.height = insets.top
-            binding.statusBarShade.layoutParams = mlpStatusShade
+    private fun setInsets() = ViewCompat.setOnApplyWindowInsetsListener(
+        binding.root
+    ) { _: View, windowInsets: WindowInsetsCompat ->
+        val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+        val mlpStatusShade = binding.statusBarShade.layoutParams as MarginLayoutParams
+        mlpStatusShade.height = insets.top
+        binding.statusBarShade.layoutParams = mlpStatusShade
 
-            // The only situation where we care to have a nav bar shade is when it's at the bottom
-            // of the screen where scrolling list elements can go behind it.
-            val mlpNavShade = binding.navigationBarShade.layoutParams as MarginLayoutParams
-            mlpNavShade.height = insets.bottom
-            binding.navigationBarShade.layoutParams = mlpNavShade
+        // The only situation where we care to have a nav bar shade is when it's at the bottom
+        // of the screen where scrolling list elements can go behind it.
+        val mlpNavShade = binding.navigationBarShade.layoutParams as MarginLayoutParams
+        mlpNavShade.height = insets.bottom
+        binding.navigationBarShade.layoutParams = mlpNavShade
 
-            windowInsets
-        }
+        windowInsets
+    }
 
     private fun createOpenCitraDirectoryLauncher(
         permissionsLost: Boolean
     ): ActivityResultLauncher<Uri?> {
-        return registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { result: Uri? ->
+        return registerForActivityResult(
+            ActivityResultContracts.OpenDocumentTree()
+        ) { result: Uri? ->
             if (result == null) {
                 return@registerForActivityResult
             }
@@ -434,7 +445,8 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
 
         val workManager = WorkManager.getInstance(applicationContext)
         workManager.enqueueUniqueWork(
-            "installCiaWork", ExistingWorkPolicy.APPEND_OR_REPLACE,
+            "installCiaWork",
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             OneTimeWorkRequest.Builder(CiaInstallWorker::class.java)
                 .setInputData(
                     Data.Builder().putStringArray("CIA_FILES", selectedFiles)
@@ -446,7 +458,7 @@ class MainActivity : AppCompatActivity(), ThemeProvider {
     }
 
     val setupOpenCitraDirectory = registerForActivityResult(
-        ActivityResultContracts.OpenDocumentTree(),
+        ActivityResultContracts.OpenDocumentTree()
     ) { result: Uri? ->
         homeViewModel.selectedCitraDirectory = result
     }
