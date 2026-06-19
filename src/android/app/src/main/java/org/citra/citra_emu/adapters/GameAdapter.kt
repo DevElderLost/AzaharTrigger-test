@@ -695,17 +695,20 @@ class GameAdapter(
         bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
         // Fix: landscape mode agar BottomSheet tidak terpotong
         if (context.resources.configuration.orientation ==
-                android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        ) {
             bottomSheetBehavior.peekHeight = context.resources.displayMetrics.heightPixels
         }
         // Fix: landscape mode agar BottomSheet tidak terpotong
         if (context.resources.configuration.orientation ==
-                android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        ) {
             bottomSheetBehavior.peekHeight = context.resources.displayMetrics.heightPixels
         }
         // Fix: landscape mode agar BottomSheet tidak terpotong
         if (context.resources.configuration.orientation ==
-                android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        ) {
             bottomSheetBehavior.peekHeight = context.resources.displayMetrics.heightPixels
         }
 

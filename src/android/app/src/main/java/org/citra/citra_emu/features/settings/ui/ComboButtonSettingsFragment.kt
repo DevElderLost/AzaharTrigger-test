@@ -13,7 +13,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import org.citra.citra_emu.viewmodel.HomeViewModel
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -22,6 +21,7 @@ import org.citra.citra_emu.R
 import org.citra.citra_emu.databinding.FragmentComboButtonSettingsBinding
 import org.citra.citra_emu.databinding.ItemComboButtonBinding
 import org.citra.citra_emu.overlay.ComboButtonManager
+import org.citra.citra_emu.viewmodel.HomeViewModel
 
 class ComboButtonSettingsFragment : Fragment() {
 
@@ -32,7 +32,7 @@ class ComboButtonSettingsFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enterTransition  = MaterialSharedAxis(MaterialSharedAxis.X, true)
+        enterTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
         returnTransition = MaterialSharedAxis(MaterialSharedAxis.X, false)
     }
 
@@ -65,7 +65,9 @@ class ComboButtonSettingsFragment : Fragment() {
         // Inflate satu card per slot
         for (slot in 1..ComboButtonManager.COMBO_COUNT) {
             val cardBinding = ItemComboButtonBinding.inflate(
-                layoutInflater, binding.comboContainer, true
+                layoutInflater,
+                binding.comboContainer,
+                true
             )
             bindSlot(cardBinding, slot)
         }
@@ -112,10 +114,10 @@ class ComboButtonSettingsFragment : Fragment() {
 
     private fun showPickerDialog(slot: Int, onDone: () -> Unit) {
         val assignable = ComboButtonManager.assignableButtons
-        val names      = assignable.map { it.first }.toTypedArray()
-        val ids        = assignable.map { it.second }
-        val selected   = ComboButtonManager.getButtonsForSlot(slot).toMutableSet()
-        val checked    = BooleanArray(names.size) { i -> ids[i] in selected }
+        val names = assignable.map { it.first }.toTypedArray()
+        val ids = assignable.map { it.second }
+        val selected = ComboButtonManager.getButtonsForSlot(slot).toMutableSet()
+        val checked = BooleanArray(names.size) { i -> ids[i] in selected }
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Assign buttons — Combo $slot")
@@ -126,12 +128,18 @@ class ComboButtonSettingsFragment : Fragment() {
                         checked[which] = false
                         Toast.makeText(
                             requireContext(),
-                            getString(R.string.combo_button_max_exceeded,
-                                ComboButtonManager.MAX_BUTTONS_PER_COMBO),
+                            getString(
+                                R.string.combo_button_max_exceeded,
+                                ComboButtonManager.MAX_BUTTONS_PER_COMBO
+                            ),
                             Toast.LENGTH_SHORT
                         ).show()
-                    } else selected.add(id)
-                } else selected.remove(id)
+                    } else {
+                        selected.add(id)
+                    }
+                } else {
+                    selected.remove(id)
+                }
             }
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 ComboButtonManager.setButtonsForSlot(slot, selected.toList())
