@@ -3,6 +3,7 @@
 // Refer to the license.txt file included.
 
 import android.databinding.tool.ext.capitalizeUS
+import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 import de.undercouch.gradle.tasks.download.Download
 
 plugins {
@@ -21,6 +22,20 @@ plugins {
  */
 val autoVersion = (((System.currentTimeMillis() / 1000) - 1451606400) / 10).toInt()
 val abiFilter = listOf("arm64-v8a", "x86_64")
+
+
+fun getFixedVersionCode(versionName: String): Int {
+    val parts = versionName.split(".")
+    val major = if (parts.size > 0) parts[0].toIntOrNull() ?: 0 else 0
+    val minor = if (parts.size > 1) parts[1].toIntOrNull() ?: 0 else 0
+    val patch = if (parts.size > 2) parts[2].toIntOrNull() ?: 0 else 0
+
+    if (major == 0 && minor == 0 && patch == 0) {
+        return autoVersion
+    }
+    
+    return major * 1000000 + minor * 10000 + patch * 100
+}
 
 val downloadedJniLibsPath = "${layout.buildDirectory.get().asFile.path}/downloadedJniLibs"
 
@@ -67,8 +82,9 @@ android {
 
         minSdk = 28
         targetSdk = 35
-        versionCode = autoVersion
-        versionName = getGitVersion()
+        val versionNameValue = getGitVersion()
+        versionName = versionNameValue
+        versionCode = getFixedVersionCode(versionNameValue)
 
         ndk {
             //noinspection ChromeOsAbiSupport
@@ -83,8 +99,9 @@ android {
                     "-DCMAKE_CXX_SCAN_FOR_MODULES=OFF", // Disable C++20 modules for old Ninja version
                     "-DALSOFT_ENABLE_MODULES=OFF", // Disable C++20 modules in openal-soft
                     "-DANDROID_ARM_NEON=true", // cryptopp requires Neon to work
-                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", // Support Android 15 16KiB page sizes
-                    "-DENABLE_GDBSTUB=OFF", // Disable GDB stub
+                    "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", // Support Android 15 16KiB page
+                    // sizes
+                    "-DENABLE_GDBSTUB=OFF" // Disable GDB stub
                 )
             }
         }
@@ -93,14 +110,16 @@ android {
         buildConfigField("String", "BRANCH", "\"${getBranch()}\"")
     }
 
-    val keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+    val localProps = gradleLocalProperties(rootDir, providers)
+    val keystoreFile = localProps["ANDROID_KEYSTORE"] as String?
     if (keystoreFile != null) {
         signingConfigs {
             create("release") {
                 storeFile = file(keystoreFile)
-                storePassword = System.getenv("ANDROID_KEYSTORE_PASS")
-                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-                keyPassword = System.getenv("ANDROID_KEYSTORE_PASS")
+                storePassword = localProps["ANDROID_KEYSTORE_PASSWORD"] as String? ?: ""
+                keyAlias = localProps["ANDROID_KEY_ALIAS"] as String? ?: ""
+                keyPassword = (localProps["ANDROID_KEY_PASSWORD"] as String?)
+                    ?: (localProps["ANDROID_KEYSTORE_PASSWORD"] as String? ?: "")
             }
         }
     }
@@ -129,7 +148,8 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             signingConfig = signingConfigs.getByName("debug")
-            isShrinkResources = true // TODO: Does this actually do anything when isDebuggable is enabled? -OS
+            isShrinkResources = true
+            // TODO: ^- Does this actually do anything when isDebuggable is enabled? -OS
             isDebuggable = true
             isJniDebuggable = true
             proguardFiles(
@@ -140,8 +160,10 @@ android {
         }
 
         // Same as above, but with isDebuggable disabled.
-        // Primarily exists to allow development on hardened_malloc systems (e.g. GrapheneOS) without constantly tripping over years-old and seemingly harmless memory bugs.
-        // We should fix those bugs eventually, but for now this exists as a workaround to allow other work to be done.
+        // Primarily exists to allow development on hardened_malloc systems (e.g. GrapheneOS)
+        // without constantly tripping over years-old and seemingly harmless memory bugs.
+        // We should fix those bugs eventually, but for now this exists as a workaround to
+        // allow other work to be done on these devices.
         register("relWithDebInfoLite") {
             initWith(getByName("relWithDebInfo"))
             signingConfig = signingConfigs.getByName("debug")
@@ -151,7 +173,7 @@ android {
             }
             lint {
                 checkReleaseBuilds = false // Ditto
-                                           // The name of this property is misleading, this doesn't actually disable linting for the `release` build.
+                // ^- The name of this property is misleading, this doesn't actually disable linting for the `release` build.
             }
         }
 
@@ -219,7 +241,9 @@ dependencies {
 
 // Download Vulkan Validation Layers from the KhronosGroup GitHub.
 val downloadVulkanValidationLayers = tasks.register<Download>("downloadVulkanValidationLayers") {
-    src("https://github.com/KhronosGroup/Vulkan-ValidationLayers/releases/download/vulkan-sdk-1.4.313.0/android-binaries-1.4.313.0.zip")
+    src(
+        "https://github.com/KhronosGroup/Vulkan-ValidationLayers/releases/download/vulkan-sdk-1.4.313.0/android-binaries-1.4.313.0.zip"
+    )
     dest(file("${layout.buildDirectory.get().asFile.path}/tmp/Vulkan-ValidationLayers.zip"))
     onlyIfModified(true)
 }
@@ -240,9 +264,16 @@ val unzipVulkanValidationLayers = tasks.register<Copy>("unzipVulkanValidationLay
 tasks.named("preBuild") {
     dependsOn(unzipVulkanValidationLayers)
 }
-
 fun getGitVersion(): String {
     var versionName = "0.0"
+
+    // Check for GIT-TAG file first (manual version control)
+    val gitTagFile = File(project.rootDir, "GIT-TAG")
+    if (gitTagFile.exists()) {
+        versionName = gitTagFile.readText().trim()
+        logger.lifecycle("Using version from GIT-TAG file: $versionName")
+        return versionName
+    }
 
     try {
         versionName = ProcessBuilder("git", "describe", "--always", "--long")
@@ -251,7 +282,10 @@ fun getGitVersion(): String {
             .redirectError(ProcessBuilder.Redirect.PIPE)
             .start().inputStream.bufferedReader().use { it.readText() }
             .trim()
-            .replace(Regex("(-0)?-[^-]+$"), "")
+        if (versionName.startsWith("v") && versionName.length > 1 && versionName[1].isDigit()) {
+            versionName = versionName.substring(1)
+        }
+        logger.lifecycle("Using version from git describe: $versionName")
     } catch (e: Exception) {
         logger.error("Cannot find git, defaulting to dummy version number")
     }
@@ -259,6 +293,7 @@ fun getGitVersion(): String {
     if (System.getenv("GITHUB_ACTIONS") != null) {
         val gitTag = System.getenv("GIT_TAG_NAME")
         versionName = gitTag ?: versionName
+        logger.lifecycle("Using version from GITHUB_ACTIONS env: $versionName")
     }
 
     return versionName
@@ -270,7 +305,7 @@ fun getGitHash(): String =
 fun getBranch(): String =
     runGitCommand(ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")) ?: "dummy-branch"
 
-fun runGitCommand(command: ProcessBuilder) : String? {
+fun runGitCommand(command: ProcessBuilder): String? {
     try {
         command.directory(project.rootDir)
         val process = command.start()
@@ -296,7 +331,7 @@ android.applicationVariants.configureEach {
     val variant = this
     val capitalizedName = variant.name.capitalizeUS()
 
-    val copyTask = tasks.register("copyBundle${capitalizedName}") {
+    val copyTask = tasks.register("copyBundle$capitalizedName") {
         doLast {
             project.copy {
                 from(variant.outputs.first().outputFile.parentFile)
@@ -310,5 +345,5 @@ android.applicationVariants.configureEach {
             }
         }
     }
-    tasks.named("bundle${capitalizedName}").configure { finalizedBy(copyTask) }
+    tasks.named("bundle$capitalizedName").configure { finalizedBy(copyTask) }
 }

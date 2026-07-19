@@ -70,6 +70,7 @@ Lobby::Lobby(Core::System& system_, QWidget* parent, QStandardItemModel* list,
     connect(ui->games_owned, &QCheckBox::toggled, proxy, &LobbyFilterProxyModel::SetFilterOwned);
     connect(ui->hide_empty, &QCheckBox::toggled, proxy, &LobbyFilterProxyModel::SetFilterEmpty);
     connect(ui->hide_full, &QCheckBox::toggled, proxy, &LobbyFilterProxyModel::SetFilterFull);
+    connect(ui->hide_locked, &QCheckBox::toggled, proxy, &LobbyFilterProxyModel::SetFilterLocked);
     connect(ui->room_list, &QTreeView::doubleClicked, this, &Lobby::OnJoinRoom);
     connect(ui->room_list, &QTreeView::clicked, this, &Lobby::OnExpandRoom);
 
@@ -124,6 +125,7 @@ Lobby::Lobby(Core::System& system_, QWidget* parent, QStandardItemModel* list,
     ui->games_owned->setChecked(UISettings::values.multiplayer_filter_games_owned);
     ui->hide_empty->setChecked(UISettings::values.multiplayer_filter_hide_empty);
     ui->hide_full->setChecked(UISettings::values.multiplayer_filter_hide_full);
+    ui->hide_locked->setChecked(UISettings::values.multiplayer_filter_hide_locked);
 
     // manually start a refresh when the window is opening
     // TODO(jroweboy): if this refresh is slow for people with bad internet, then don't do it as
@@ -236,6 +238,7 @@ void Lobby::OnJoinRoom(const QModelIndex& source) {
     UISettings::values.multiplayer_filter_games_owned = ui->games_owned->isChecked();
     UISettings::values.multiplayer_filter_hide_empty = ui->hide_empty->isChecked();
     UISettings::values.multiplayer_filter_hide_full = ui->hide_full->isChecked();
+    UISettings::values.multiplayer_filter_hide_locked = ui->hide_locked->isChecked();
 }
 
 void Lobby::ResetModel() {
@@ -284,11 +287,15 @@ void Lobby::OnRefreshLobby() {
         }
 
         auto first_item = new LobbyItem();
+
+        QString preferred_game = room.preferred_game == "%none%"
+                                     ? tr("No Preference")
+                                     : QString::fromStdString(room.preferred_game);
+
         auto row = QList<QStandardItem*>({
             first_item,
             new LobbyItemName(room.has_password, QString::fromStdString(room.name)),
-            new LobbyItemGame(room.preferred_game_id, QString::fromStdString(room.preferred_game),
-                              smdh_icon),
+            new LobbyItemGame(room.preferred_game_id, preferred_game, smdh_icon),
             new LobbyItemHost(QString::fromStdString(room.owner), QString::fromStdString(room.ip),
                               room.port, QString::fromStdString(room.verify_UID)),
             new LobbyItemMemberList(members, room.max_player),
@@ -360,6 +367,15 @@ bool LobbyFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex& s
         }
     }
 
+    if (filter_locked) {
+        QModelIndex password_index = sourceModel()->index(sourceRow, Column::ROOM_NAME);
+        bool has_password =
+            sourceModel()->data(password_index, LobbyItemName::PasswordRole).toBool();
+        if (has_password) {
+            return false;
+        }
+    }
+
     // filter by search parameters
     if (!filter_search.isEmpty()) {
         QModelIndex game_name = sourceModel()->index(sourceRow, Column::GAME_NAME, sourceParent);
@@ -425,6 +441,11 @@ void LobbyFilterProxyModel::SetFilterEmpty(bool filter) {
 
 void LobbyFilterProxyModel::SetFilterFull(bool filter) {
     filter_full = filter;
+    invalidate();
+}
+
+void LobbyFilterProxyModel::SetFilterLocked(bool filter) {
+    filter_locked = filter;
     invalidate();
 }
 

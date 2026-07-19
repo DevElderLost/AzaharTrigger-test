@@ -8,13 +8,17 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <thread>
+#include <vector>
+#include <QAbstractButton>
 #include <QFileDialog>
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPalette>
+#include <QProgressDialog>
 #include <QSysInfo>
 #include <QtConcurrent/QtConcurrentMap>
 #include <QtConcurrent/QtConcurrentRun>
@@ -80,6 +84,7 @@
 #include "common/play_time_manager.h"
 #ifdef ENABLE_QT_UPDATE_CHECKER
 #include "citra_qt/update_checker.h"
+#include "citra_qt/updater/self_updater.h"
 #endif
 #include "citra_qt/util/clickable_label.h"
 #include "citra_qt/util/graphics_device_info.h"
@@ -251,13 +256,46 @@ static bool ShouldCheckForPrereleaseUpdates() {
     return (IsPrereleaseBuild() || using_prerelease_channel);
 }
 
-static int GetMajorVersion(const std::string& version) {
-    size_t dot = version.find('.');
-    try {
-        return std::stoi(version.substr(0, dot));
-    } catch (...) {
-        return 0;
+// Parses a version string like "v1.2.3" (or "1.2.3", "1.2.3-rc1", a bare
+// git hash, etc.) into its numeric dot-separated components. Any leading
+// non-digit characters (e.g. a "v" prefix) are skipped first, since
+// std::stoi throws on those and previously caused every parse to silently
+// collapse to {0}. Non-numeric trailing garbage (e.g. "-rc1") just stops
+// the parse at that component rather than failing the whole string.
+static std::vector<int> ParseVersionComponents(const std::string& version) {
+    std::vector<int> parts;
+    const auto start = version.find_first_of("0123456789");
+    if (start == std::string::npos) {
+        return parts;
     }
+    std::stringstream ss(version.substr(start));
+    std::string segment;
+    while (std::getline(ss, segment, '.')) {
+        try {
+            parts.push_back(std::stoi(segment));
+        } catch (...) {
+            break;
+        }
+    }
+    return parts;
+}
+
+// Returns true if `latest` is a strictly newer version than `current`,
+// comparing components numerically (major, then minor, then patch, ...)
+// instead of only the (previously broken) major version. Missing trailing
+// components are treated as 0, so "1.2" < "1.2.1".
+static bool IsVersionNewer(const std::string& current, const std::string& latest) {
+    const auto current_parts = ParseVersionComponents(current);
+    const auto latest_parts = ParseVersionComponents(latest);
+    const std::size_t count = std::max(current_parts.size(), latest_parts.size());
+    for (std::size_t i = 0; i < count; ++i) {
+        const int c = i < current_parts.size() ? current_parts[i] : 0;
+        const int l = i < latest_parts.size() ? latest_parts[i] : 0;
+        if (c != l) {
+            return c < l;
+        }
+    }
+    return false;
 }
 #endif
 
@@ -4808,6 +4846,9 @@ GMainWindow::GMainWindow(Core::System& system_)
     InitializeHotkeys();
     InitializeAmiibos();
 
+    virtual_touch_pointer =
+        std::make_unique<VirtualTouchPointer>(render_window, secondary_window, this);
+
     SetDefaultUIGeometry();
     RestoreUIState();
 
@@ -4867,20 +4908,39 @@ GMainWindow::GMainWindow(Core::System& system_)
 
 #ifdef ENABLE_QT_UPDATE_CHECKER
     if (UISettings::values.check_for_update_on_start) {
-        update_future = QtConcurrent::run([]() -> QString {
-            const std::optional<std::string> latest_release_tag =
-                UpdateChecker::GetLatestRelease(ShouldCheckForPrereleaseUpdates());
-
-            if (latest_release_tag && latest_release_tag.value() != Common::g_build_fullname) {
-                const int latest_major_version = GetMajorVersion(latest_release_tag.value());
-                const int current_major_version = GetMajorVersion(Common::g_build_fullname);
-                if (current_major_version <= latest_major_version) {
-                    return QString::fromStdString(latest_release_tag.value());
-                }
+        update_future = QtConcurrent::run([]() -> std::optional<UpdateChecker::ReleaseInfo> {
+            auto release = UpdateChecker::GetLatestReleaseInfo(ShouldCheckForPrereleaseUpdates());
+            if (!release || release->tag_name.empty()) {
+                LOG_INFO(Frontend, "No release found");
+                return std::nullopt;
             }
-            return QString{};
+
+            auto latest_build_version =
+                UpdateChecker::GetLatestBuildVersion(ShouldCheckForPrereleaseUpdates());
+            if (!latest_build_version) {
+                LOG_INFO(Frontend, "Could not extract build version from release assets");
+                return std::nullopt;
+            }
+
+            const std::string current_build_version = Common::g_build_version;
+            LOG_INFO(Frontend, "Current build version: {}, Latest build version: {}",
+                     current_build_version, *latest_build_version);
+
+            if (*latest_build_version == current_build_version) {
+                LOG_INFO(Frontend, "Already on latest build version: {}", current_build_version);
+                return std::nullopt;
+            }
+
+            if (IsVersionNewer(current_build_version, *latest_build_version)) {
+                LOG_INFO(Frontend, "Update available: {} -> {}", current_build_version,
+                         *latest_build_version);
+                return release;
+            }
+            LOG_INFO(Frontend, "No update needed (latest build is not newer than current)");
+            return std::nullopt;
         });
-        QObject::connect(&update_watcher, &QFutureWatcher<QString>::finished, this,
+        QObject::connect(&update_watcher,
+                         &QFutureWatcher<std::optional<UpdateChecker::ReleaseInfo>>::finished, this,
                          &GMainWindow::OnEmulatorUpdateAvailable);
         update_watcher.setFuture(update_future);
     }
@@ -4919,11 +4979,6 @@ void GMainWindow::InitializeWidgets() {
     render_window->hide();
     secondary_window->hide();
     secondary_window->setParent(nullptr);
-
-    action_secondary_fullscreen = new QAction(secondary_window);
-    action_secondary_toggle_screen = new QAction(secondary_window);
-    action_secondary_swap_screen = new QAction(secondary_window);
-    action_secondary_rotate_screen = new QAction(secondary_window);
 
     game_list = new GameList(*play_time_manager, this);
     ui->horizontalLayout->addWidget(game_list);
@@ -5302,7 +5357,8 @@ void GMainWindow::InitializeSaveStateMenuActions() {
 
 void GMainWindow::InitializeHotkeys() {
     hotkey_registry.LoadHotkeys();
-
+    hotkey_registry.buttonMonitor.start(16);
+    LOG_DEBUG(Frontend, "Initializing hotkeys");
     const QString main_window = QStringLiteral("Main Window");
     const QString fullscreen = QStringLiteral("Fullscreen");
 
@@ -5311,11 +5367,20 @@ void GMainWindow::InitializeHotkeys() {
                                           const bool primary_only = false,
                                           const bool auto_repeat = false) {
         static const QString main_window = QStringLiteral("Main Window");
-        action->setShortcut(hotkey_registry.GetKeySequence(main_window, action_name));
+        auto context = hotkey_registry.GetShortcutContext(main_window, action_name);
+        auto shortcut = hotkey_registry.GetKeySequence(main_window, action_name);
+        action->setShortcut(shortcut);
+        action->setShortcutContext(context);
         action->setAutoRepeat(auto_repeat);
         this->addAction(action);
-        if (!primary_only)
-            secondary_window->addAction(action);
+        // handle the shortcuts that are different per-screen
+        if (context == Qt::WidgetShortcut) {
+            render_window->addAction(action);
+            if (!primary_only) {
+                secondary_window->addAction(action);
+            }
+        }
+        hotkey_registry.SetAction(main_window, action_name, action);
     };
 
     link_action_shortcut(ui->action_Load_File, QStringLiteral("Load File"));
@@ -5327,7 +5392,7 @@ void GMainWindow::InitializeHotkeys() {
     link_action_shortcut(ui->action_Stop, QStringLiteral("Stop Emulation"));
     link_action_shortcut(ui->action_Show_Filter_Bar, QStringLiteral("Toggle Filter Bar"));
     link_action_shortcut(ui->action_Show_Status_Bar, QStringLiteral("Toggle Status Bar"));
-    link_action_shortcut(ui->action_Fullscreen, fullscreen, true);
+    link_action_shortcut(ui->action_Fullscreen, fullscreen);
     link_action_shortcut(ui->action_Capture_Screenshot, QStringLiteral("Capture Screenshot"));
     link_action_shortcut(ui->action_Debug_Pause, QStringLiteral("Debug Pause"));
     link_action_shortcut(ui->action_Debug_Resume, QStringLiteral("Debug Resume"));
@@ -5354,19 +5419,21 @@ void GMainWindow::InitializeHotkeys() {
     // QShortcut Hotkeys
     const auto connect_shortcut = [&](const QString& action_name, const auto& function) {
         const auto* hotkey = hotkey_registry.GetHotkey(main_window, action_name, this);
-        const auto* secondary_hotkey =
-            hotkey_registry.GetHotkey(main_window, action_name, secondary_window);
         connect(hotkey, &QShortcut::activated, this, function);
-        connect(secondary_hotkey, &QShortcut::activated, this, function);
     };
 
     connect_shortcut(QStringLiteral("Toggle Screen Layout"), &GMainWindow::ToggleScreenLayout);
     connect_shortcut(QStringLiteral("Exit Fullscreen"), [&] {
         if (emulation_running) {
-            ui->action_Fullscreen->setChecked(false);
-            ToggleFullscreen();
+            if (secondary_window->isActiveWindow()) {
+                secondary_window->showNormal();
+            } else {
+                ui->action_Fullscreen->setChecked(false);
+                ToggleFullscreen();
+            }
         }
     });
+
     connect_shortcut(QStringLiteral("Toggle Per-Application Speed"), [&] {
         if (!hotkey_registry
                  .GetKeySequence(QStringLiteral("Main Window"), QStringLiteral("Toggle Turbo Mode"))
@@ -5390,6 +5457,22 @@ void GMainWindow::InitializeHotkeys() {
     connect_shortcut(QStringLiteral("Audio Mute/Unmute"), &GMainWindow::OnMute);
     connect_shortcut(QStringLiteral("Audio Volume Down"), &GMainWindow::OnDecreaseVolume);
     connect_shortcut(QStringLiteral("Audio Volume Up"), &GMainWindow::OnIncreaseVolume);
+
+    connect_shortcut(QStringLiteral("Toggle Virtual Touchpad (C-Stick)"), [&] {
+        if (virtual_touch_pointer) {
+            virtual_touch_pointer->ToggleTouchMode();
+        }
+    });
+    connect_shortcut(QStringLiteral("Virtual Touchpad Tap"), [&] {
+        if (virtual_touch_pointer) {
+            virtual_touch_pointer->QuickTap();
+        }
+    });
+    connect_shortcut(QStringLiteral("Virtual Touchpad Drag/Drop"), [&] {
+        if (virtual_touch_pointer) {
+            virtual_touch_pointer->ToggleTap();
+        }
+    });
 
     // We use "static" here in order to avoid capturing by lambda due to a MSVC bug, which makes the
     // variable hold a garbage value after this function exits
@@ -5417,21 +5500,6 @@ void GMainWindow::InitializeHotkeys() {
             UpdateStatusBar();
         }
     });
-
-    // Secondary Window QAction Hotkeys
-    const auto add_secondary_window_hotkey = [this](QAction* action, QKeySequence hotkey,
-                                                    const char* slot) {
-        // This action will fire specifically when secondary_window is in focus
-        action->setShortcut(hotkey);
-        disconnect(action, SIGNAL(triggered()), this, slot);
-        connect(action, SIGNAL(triggered()), this, slot);
-        secondary_window->addAction(action);
-    };
-
-    // Use the same fullscreen hotkey as the main window
-    const auto fullscreen_hotkey = hotkey_registry.GetKeySequence(main_window, fullscreen);
-    add_secondary_window_hotkey(action_secondary_fullscreen, fullscreen_hotkey,
-                                SLOT(ToggleSecondaryFullscreen()));
 }
 
 void GMainWindow::SetDefaultUIGeometry() {
@@ -5450,6 +5518,7 @@ void GMainWindow::RestoreUIState() {
     restoreGeometry(UISettings::values.geometry);
     restoreState(UISettings::values.state);
     render_window->restoreGeometry(UISettings::values.renderwindow_geometry);
+    secondary_window->restoreGeometry(UISettings::values.secondarywindow_geometry);
 #if MICROPROFILE_ENABLED
     microProfileDialog->restoreGeometry(UISettings::values.microprofile_geometry);
     microProfileDialog->setVisible(UISettings::values.microprofile_visible.GetValue());
@@ -5594,6 +5663,9 @@ void GMainWindow::ConnectMenuEvents() {
     connect_menu(ui->action_Previous_Amiibo, &GMainWindow::OnPreviousAmiibo);
     connect_menu(ui->action_Load_Amiibo, &GMainWindow::OnLoadAmiibo);
     connect_menu(ui->action_Remove_Amiibo, &GMainWindow::OnRemoveAmiibo);
+    connect_menu(ui->action_Open_Citra_Folder, &GMainWindow::OnOpenCitraFolder);
+    connect_menu(ui->action_Open_NAND_Folder, &GMainWindow::OnOpenNANDFolder);
+    connect_menu(ui->action_Open_SDMC_Folder, &GMainWindow::OnOpenSDMCFolder);
 
     // Emulation
     connect_menu(ui->action_Pause, &GMainWindow::OnPauseContinueGame);
@@ -5684,7 +5756,6 @@ void GMainWindow::ConnectMenuEvents() {
     connect_menu(ui->action_Decompress_ROM_File, &GMainWindow::OnDecompressFile);
 
     // Help
-    connect_menu(ui->action_Open_Citra_Folder, &GMainWindow::OnOpenCitraFolder);
     connect_menu(ui->action_Open_Log_Folder, []() {
         QString path = QString::fromStdString(FileUtil::GetUserPath(FileUtil::UserPath::LogDir));
         QDesktopServices::openUrl(QUrl::fromLocalFile(path));
@@ -5693,6 +5764,11 @@ void GMainWindow::ConnectMenuEvents() {
         QDesktopServices::openUrl(QUrl(QStringLiteral("https://azahar-emu.org/pages/faq/")));
     });
     connect_menu(ui->action_libzip, &GMainWindow::OnMenuLibzipLicence);
+#ifdef ENABLE_QT_UPDATE_CHECKER
+    connect_menu(ui->action_Check_For_Updates, &GMainWindow::OnMenuCheckForUpdates);
+#else
+    ui->action_Check_For_Updates->setVisible(false);
+#endif
     connect_menu(ui->action_About, &GMainWindow::OnMenuAboutCitra, QAction::AboutRole);
 }
 
@@ -7323,10 +7399,16 @@ void GMainWindow::ToggleFullscreen() {
     if (!emulation_running) {
         return;
     }
-    if (ui->action_Fullscreen->isChecked()) {
-        ShowFullscreen();
+    if (secondary_window->isVisible() && secondary_window->isActiveWindow()) {
+        // undo the action and fullscreen secondary manually
+        ui->action_Fullscreen->toggle();
+        ToggleSecondaryFullscreen();
     } else {
-        HideFullscreen();
+        if (ui->action_Fullscreen->isChecked()) {
+            ShowFullscreen();
+        } else {
+            HideFullscreen();
+        }
     }
 }
 
@@ -7338,11 +7420,14 @@ void GMainWindow::ToggleSecondaryFullscreen() {
 #ifdef NEEDS_ROUND_CORNERS_FIX
         WindowCornerManager::instance().blockRoundedCorners(secondary_window, false);
 #endif
+        secondary_window->restoreGeometry(UISettings::values.secondarywindow_geometry);
         secondary_window->showNormal();
     } else {
 #ifdef NEEDS_ROUND_CORNERS_FIX
         WindowCornerManager::instance().blockRoundedCorners(secondary_window, true);
 #endif
+        UISettings::values.secondarywindow_geometry = secondary_window->saveGeometry();
+        LOG_INFO(Frontend, "Attempting to fullscreen secondary window");
         secondary_window->showFullScreen();
     }
 }
@@ -7386,7 +7471,7 @@ void GMainWindow::HideFullscreen() {
 void GMainWindow::ToggleWindowMode() {
     if (ui->action_Single_Window_Mode->isChecked()) {
         // Render in the main window...
-        render_window->BackupGeometry();
+        UISettings::values.renderwindow_geometry = render_window->saveGeometry();
         ui->horizontalLayout->addWidget(render_window);
         render_window->setFocusPolicy(Qt::StrongFocus);
         if (emulation_running) {
@@ -7399,10 +7484,9 @@ void GMainWindow::ToggleWindowMode() {
         // Render in a separate window...
         ui->horizontalLayout->removeWidget(render_window);
         render_window->setParent(nullptr);
-        render_window->setFocusPolicy(Qt::NoFocus);
         if (emulation_running) {
             render_window->setVisible(true);
-            render_window->RestoreGeometry();
+            render_window->restoreGeometry(UISettings::values.renderwindow_geometry);
             game_list->show();
         }
     }
@@ -7413,11 +7497,17 @@ void GMainWindow::UpdateSecondaryWindowVisibility() {
         return;
     }
     if (Settings::values.layout_option.GetValue() == Settings::LayoutOption::SeparateWindows) {
-        secondary_window->RestoreGeometry();
+        secondary_window->restoreGeometry(UISettings::values.secondarywindow_geometry);
         secondary_window->show();
     } else {
-        secondary_window->BackupGeometry();
+        UISettings::values.secondarywindow_geometry = secondary_window->saveGeometry();
         secondary_window->hide();
+    }
+    // make sure focus is on primary window whenever this changes
+    if (UISettings::values.single_window_mode.GetValue()) {
+        QApplication::setActiveWindow(this);
+    } else {
+        QApplication::setActiveWindow(render_window);
     }
 }
 
@@ -7563,6 +7653,10 @@ void GMainWindow::TriggerRotateScreens() {
 }
 
 void GMainWindow::OnSaveState() {
+    if (!system.IsPoweredOn()) {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     ASSERT(action);
 
@@ -7572,6 +7666,10 @@ void GMainWindow::OnSaveState() {
 }
 
 void GMainWindow::OnLoadState() {
+    if (!system.IsPoweredOn()) {
+        return;
+    }
+
     QAction* action = qobject_cast<QAction*>(sender());
     ASSERT(action);
 
@@ -7771,6 +7869,16 @@ void GMainWindow::OnOpenCitraFolder() {
         QString::fromStdString(FileUtil::GetUserPath(FileUtil::UserPath::UserDir))));
 }
 
+void GMainWindow::OnOpenNANDFolder() {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(
+        QString::fromStdString(FileUtil::GetUserPath(FileUtil::UserPath::NANDDir))));
+}
+
+void GMainWindow::OnOpenSDMCFolder() {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(
+        QString::fromStdString(FileUtil::GetUserPath(FileUtil::UserPath::SDMCDir))));
+}
+
 void GMainWindow::OnToggleFilterBar() {
     game_list->SetFilterVisible(ui->action_Show_Filter_Bar->isChecked());
     if (ui->action_Show_Filter_Bar->isChecked()) {
@@ -7899,7 +8007,6 @@ void GMainWindow::OnCaptureScreenshot() {
                                           .toString(QStringLiteral("dd.MM.yy_hh.mm.ss.z"))
                                           .toStdString();
         path.append(fmt::format("/{}_{}.png", filename, timestamp));
-
         auto* const screenshot_window =
             secondary_window->HasFocus() ? secondary_window : render_window;
         screenshot_window->CaptureScreenshot(
@@ -8834,14 +8941,14 @@ void GMainWindow::LoadTranslation() {
 
     if (UISettings::values.language.isEmpty()) {
         // Use the system's default locale
-        loaded = translator.load(QLocale::system(), {}, {}, QStringLiteral(":/languages/"));
+        loaded = citraTranslator.load(QLocale::system(), {}, {}, QStringLiteral(":/languages/"));
     } else {
         // Otherwise load from the specified file
-        loaded = translator.load(UISettings::values.language, QStringLiteral(":/languages/"));
+        loaded = citraTranslator.load(UISettings::values.language, QStringLiteral(":/languages/"));
     }
 
     if (loaded) {
-        qApp->installTranslator(&translator);
+        qApp->installTranslator(&citraTranslator);
     } else {
         UISettings::values.language = QStringLiteral("en");
     }
@@ -8849,7 +8956,7 @@ void GMainWindow::LoadTranslation() {
 
 void GMainWindow::OnLanguageChanged(const QString& locale) {
     if (UISettings::values.language != QStringLiteral("en")) {
-        qApp->removeTranslator(&translator);
+        qApp->removeTranslator(&citraTranslator);
     }
 
     UISettings::values.language = locale;
@@ -8895,27 +9002,155 @@ void GMainWindow::OnMoviePlaybackCompleted() {
 
 #ifdef ENABLE_QT_UPDATE_CHECKER
 void GMainWindow::OnEmulatorUpdateAvailable() {
-    QString version_string = update_future.result();
-    if (version_string.isEmpty())
+    const std::optional<UpdateChecker::ReleaseInfo> release = update_future.result();
+    if (!release) {
         return;
+    }
+    // The update check already compared build versions, so if we got here, an update is available
+    PromptAndApplyUpdate(*release);
+}
+
+void GMainWindow::OnMenuCheckForUpdates() {
+    ui->action_Check_For_Updates->setEnabled(false);
+    ui->action_Check_For_Updates->setText(tr("Checking for Updates..."));
+
+    auto* watcher = new QFutureWatcher<std::optional<UpdateChecker::ReleaseInfo>>(this);
+    connect(watcher, &QFutureWatcher<std::optional<UpdateChecker::ReleaseInfo>>::finished, this,
+            [this, watcher] {
+                ui->action_Check_For_Updates->setEnabled(true);
+                ui->action_Check_For_Updates->setText(tr("Check for Updates..."));
+
+                const std::optional<UpdateChecker::ReleaseInfo> release = watcher->result();
+                watcher->deleteLater();
+
+                if (!release) {
+                    QMessageBox::information(this, tr("No Updates Available"),
+                                             tr("You are already running the latest version of "
+                                                "Azahar."));
+                    return;
+                }
+                PromptAndApplyUpdate(*release);
+            });
+
+    const auto future = QtConcurrent::run([]() -> std::optional<UpdateChecker::ReleaseInfo> {
+        auto release = UpdateChecker::GetLatestReleaseInfo(ShouldCheckForPrereleaseUpdates());
+        if (!release || release->tag_name.empty()) {
+            return std::nullopt;
+        }
+
+        // Compare build versions instead of git tags to avoid conflicts across platforms
+        auto latest_build_version =
+            UpdateChecker::GetLatestBuildVersion(ShouldCheckForPrereleaseUpdates());
+        if (!latest_build_version) {
+            LOG_INFO(Frontend, "Could not extract build version from release assets");
+            return std::nullopt;
+        }
+
+        const std::string current_build_version = Common::g_build_version;
+        LOG_INFO(Frontend, "Current build version: {}, Latest build version: {}",
+                 current_build_version, *latest_build_version);
+
+        if (*latest_build_version == current_build_version) {
+            LOG_INFO(Frontend, "Already on latest build version: {}", current_build_version);
+            return std::nullopt;
+        }
+
+        if (IsVersionNewer(current_build_version, *latest_build_version)) {
+            LOG_INFO(Frontend, "Update available: {} -> {}", current_build_version,
+                     *latest_build_version);
+            return release;
+        }
+        LOG_INFO(Frontend, "No update needed (latest build is not newer than current)");
+        return std::nullopt;
+    });
+    watcher->setFuture(future);
+}
+
+void GMainWindow::PromptAndApplyUpdate(const UpdateChecker::ReleaseInfo& release) {
+    const QString version_string = QString::fromStdString(release.tag_name);
+    const auto asset =
+        Updater::CanSelfUpdate() ? Updater::PickAssetForThisPlatform(release.assets) : std::nullopt;
+
+    auto open_download_page = [release] {
+        const std::string update_page_url =
+            !release.html_url.empty()
+                ? release.html_url
+                : fmt::format("https://github.com/{}/{}/releases", UpdateChecker::RepoOwner,
+                              UpdateChecker::RepoName);
+        QDesktopServices::openUrl(QUrl(QString::fromStdString(update_page_url)));
+    };
 
     QMessageBox update_prompt(this);
     update_prompt.setWindowTitle(tr("Update Available"));
     update_prompt.setIcon(QMessageBox::Information);
-    update_prompt.addButton(QMessageBox::Yes);
-    update_prompt.addButton(QMessageBox::Ignore);
-    update_prompt.setText(tr("Update %1 for Azahar is available.\nWould you like to download it?")
-                              .arg(version_string));
-    update_prompt.exec();
-    if (update_prompt.button(QMessageBox::Yes) == update_prompt.clickedButton()) {
-        std::string update_page_url;
-        if (ShouldCheckForPrereleaseUpdates()) {
-            update_page_url = "https://github.com/azahar-emu/azahar/releases";
-        } else {
-            update_page_url = "https://azahar-emu.org/pages/download/";
-        }
-        QDesktopServices::openUrl(QUrl(QString::fromStdString(update_page_url)));
+    QAbstractButton* open_page_button = nullptr;
+    QAbstractButton* ignore_button = update_prompt.addButton(QMessageBox::Ignore);
+    if (asset) {
+        update_prompt.addButton(tr("Update Now"), QMessageBox::AcceptRole);
+        open_page_button =
+            update_prompt.addButton(tr("Open Download Page"), QMessageBox::ActionRole);
+        update_prompt.setText(
+            tr("Update %1 for Azahar is available.\nWould you like to update now?")
+                .arg(version_string));
+    } else {
+        open_page_button = update_prompt.addButton(QMessageBox::Yes);
+        update_prompt.setText(
+            tr("Update %1 for Azahar is available.\nWould you like to download it?")
+                .arg(version_string));
     }
+    update_prompt.exec();
+
+    QAbstractButton* clicked = update_prompt.clickedButton();
+    if (clicked == ignore_button || clicked == nullptr) {
+        return;
+    }
+    if (clicked == open_page_button) {
+        open_download_page();
+        return;
+    }
+
+    // "Update Now" was clicked and we have a matching asset for this platform:
+    // download it and apply it in place.
+    auto* progress = new QProgressDialog(tr("Downloading update..."), tr("Cancel"), 0, 100, this);
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setAutoClose(false);
+    progress->setValue(0);
+
+    self_updater = new Updater::SelfUpdater(this);
+
+    connect(self_updater, &Updater::SelfUpdater::DownloadProgress, progress,
+            [progress](qint64 received, qint64 total) {
+                if (total > 0) {
+                    progress->setMaximum(static_cast<int>(total));
+                    progress->setValue(static_cast<int>(received));
+                }
+            });
+    connect(progress, &QProgressDialog::canceled, self_updater, &Updater::SelfUpdater::Cancel);
+    connect(self_updater, &Updater::SelfUpdater::Failed, this,
+            [this, progress, open_download_page](const QString& message) {
+                progress->close();
+                progress->deleteLater();
+                QMessageBox failure_box(this);
+                failure_box.setWindowTitle(tr("Update Failed"));
+                failure_box.setIcon(QMessageBox::Warning);
+                failure_box.setText(message);
+                failure_box.addButton(tr("Open Download Page"), QMessageBox::AcceptRole);
+                failure_box.addButton(QMessageBox::Cancel);
+                failure_box.exec();
+                if (failure_box.clickedButton() != failure_box.button(QMessageBox::Cancel)) {
+                    open_download_page();
+                }
+            });
+    connect(self_updater, &Updater::SelfUpdater::ReadyToRestart, this, [progress] {
+        progress->close();
+        progress->deleteLater();
+        // The helper process/relaunch has already been kicked off; just quit
+        // so the update can finish being applied.
+        QApplication::quit();
+    });
+
+    self_updater->Start(*asset);
 }
 #endif
 
@@ -8950,6 +9185,9 @@ void GMainWindow::UpdateUISettings() {
     if (!ui->action_Fullscreen->isChecked()) {
         UISettings::values.geometry = saveGeometry();
         UISettings::values.renderwindow_geometry = render_window->saveGeometry();
+    }
+    if (!secondary_window->isFullScreen()) {
+        UISettings::values.secondarywindow_geometry = secondary_window->saveGeometry();
     }
     UISettings::values.state = saveState();
 #if MICROPROFILE_ENABLED

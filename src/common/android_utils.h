@@ -6,11 +6,12 @@
 
 #ifdef ANDROID
 #include <string>
+#include <string_view>
 #include <vector>
 #include <fcntl.h>
 #include <jni.h>
 
-#define ANDROID_STORAGE_FUNCTIONS(V)                                                               \
+#define ANDROID_JNI_FUNCTIONS(V)                                                                   \
     V(CreateFile, bool, (const std::string& directory, const std::string& filename), create_file,  \
       "createFile", "(Ljava/lang/String;Ljava/lang/String;)Z")                                     \
     V(CreateDir, bool, (const std::string& directory, const std::string& filename), create_dir,    \
@@ -32,6 +33,8 @@
       update_document_location, "updateDocumentLocation",                                          \
       "(Ljava/lang/String;Ljava/lang/String;)Z")                                                   \
     V(GetBuildFlavor, std::string, (), get_build_flavor, "getBuildFlavor", "()Ljava/lang/String;") \
+    V(IsPortraitMode, bool, (), is_portrait_mode, "isPortraitMode", "()Z")                         \
+    V(IsUsingAngleForOpenGL, bool, (), is_using_angle_for_opengl, "isUsingAngleForOpenGL", "()Z")  \
     V(MoveFile, bool,                                                                              \
       (const std::string& filename, const std::string& source_dir_path,                            \
        const std::string& destination_dir_path),                                                   \
@@ -44,7 +47,7 @@
     V(GetSize, std::uint64_t, get_size, CallStaticLongMethod, "getSize", "(Ljava/lang/String;)J")  \
     V(DeleteDocument, bool, delete_document, CallStaticBooleanMethod, "deleteDocument",            \
       "(Ljava/lang/String;)Z")
-namespace AndroidStorage {
+namespace AndroidUtils {
 
 static JavaVM* g_jvm = nullptr;
 static jclass native_library = nullptr;
@@ -52,7 +55,7 @@ static jclass native_library = nullptr;
 #define FS(FunctionName, ReturnValue, Parameters, JMethodID, JMethodName, Signature) F(JMethodID)
 #define F(JMethodID) static jmethodID JMethodID = nullptr;
 ANDROID_SINGLE_PATH_DETERMINE_FUNCTIONS(FR)
-ANDROID_STORAGE_FUNCTIONS(FS)
+ANDROID_JNI_FUNCTIONS(FS)
 #undef F
 #undef FS
 #undef FR
@@ -74,8 +77,8 @@ enum class AndroidOpenMode {
 
 class AndroidBuildFlavors {
 public:
-    static constexpr std::string GOOGLEPLAY = "googlePlay";
-    static constexpr std::string VANILLA = "vanilla";
+    static constexpr std::string_view GOOGLEPLAY = "googlePlay";
+    static constexpr std::string_view VANILLA = "vanilla";
 };
 
 inline AndroidOpenMode operator|(AndroidOpenMode a, int b) {
@@ -91,7 +94,7 @@ void CleanupJNI();
 #define FS(FunctionName, ReturnValue, Parameters, JMethodID, JMethodName, Signature)               \
     F(FunctionName, Parameters, ReturnValue)
 #define F(FunctionName, Parameters, ReturnValue) ReturnValue FunctionName Parameters;
-ANDROID_STORAGE_FUNCTIONS(FS)
+ANDROID_JNI_FUNCTIONS(FS)
 #undef F
 #undef FS
 
@@ -102,5 +105,5 @@ ANDROID_SINGLE_PATH_DETERMINE_FUNCTIONS(FR)
 #undef F
 #undef FR
 
-} // namespace AndroidStorage
+} // namespace AndroidUtils
 #endif

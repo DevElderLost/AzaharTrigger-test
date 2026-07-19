@@ -56,6 +56,9 @@
 #include "jni/camera/still_image_camera.h"
 #include "jni/config.h"
 
+#include "core/loader/ncch.h"
+#include "network/announce_multiplayer_session.h"
+
 #include "network/announce_multiplayer_session.h"
 #ifdef ENABLE_OPENGL
 #include "jni/emu_window/emu_window_gl.h"
@@ -68,10 +71,11 @@
 #endif
 #endif
 
+#include "common/android_utils.h"
+#include "jni/android_common/android_common.h"
 #include "jni/id_cache.h"
 #include "jni/input_manager.h"
 #include "jni/ndk_motion.h"
-#include "jni/util.h"
 #include "multiplayer.h"
 #include "video_core/debug_utils/debug_utils.h"
 #include "video_core/gpu.h"
@@ -108,7 +112,7 @@ std::mutex running_mutex;
 std::condition_variable running_cv;
 
 std::string inserted_cartridge;
-// Abdroid Multiplayer which can be initialized with parameters
+// Android Multiplayer which can be initialized with parameters
 std::unique_ptr<AndroidMultiplayer> multiplayer{nullptr};
 std::shared_ptr<Network::AnnounceMultiplayerSession> announce_multiplayer_session;
 
@@ -198,7 +202,7 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
         system.InsertCartridge(inserted_cartridge);
     }
 
-    const auto graphics_api = Settings::values.graphics_api.GetValue();
+    const auto graphics_api = Settings::GetWorkingGraphicsAPI();
     EGLContext* shared_context;
     switch (graphics_api) {
 #ifdef ENABLE_OPENGL
@@ -264,7 +268,13 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
     // Register microphone permission check
     system.RegisterMicPermissionCheck(&CheckMicPermission);
 
-    Pica::g_debug_context = Pica::DebugContext::Construct();
+    // No PICA debugging on Android
+    if (Settings::values.pica_debugging) {
+        Pica::g_debug_context = Pica::DebugContext::Construct();
+    } else {
+        Pica::g_debug_context.reset();
+    }
+
     InputManager::Init();
 
     window->MakeCurrent();
@@ -400,6 +410,11 @@ void Java_org_citra_citra_1emu_NativeLibrary_secondarySurfaceChanged(JNIEnv* env
     if (secondary_window) {
         // Second window already created, so update it
         notify = secondary_window->OnSurfaceChanged(s_secondary_surface);
+
+        // Log the dimensions for debugging
+        int32_t width = ANativeWindow_getWidth(s_secondary_surface);
+        int32_t height = ANativeWindow_getHeight(s_secondary_surface);
+        LOG_INFO(Frontend, "Secondary Surface changed to {}x{}", width, height);
     } else {
         LOG_WARNING(Frontend,
                     "Second Window does not exist in native.cpp but surface changed. Ignoring.");
@@ -475,7 +490,7 @@ void Java_org_citra_citra_1emu_NativeLibrary_swapScreens([[maybe_unused]] JNIEnv
     Settings::values.swap_screen = swap_screens;
     auto& system = Core::System::GetInstance();
     if (system.IsPoweredOn()) {
-        system.GPU().Renderer().UpdateCurrentFramebufferLayout(IsPortraitMode());
+        system.GPU().Renderer().UpdateCurrentFramebufferLayout(AndroidUtils::IsPortraitMode());
     }
     InputManager::screen_rotation = rotation;
     Camera::NDK::g_rotation = rotation;
@@ -752,6 +767,10 @@ jint Java_org_citra_citra_1emu_NativeLibrary_importZipPass(JNIEnv* env, jobject 
     return Core::importZipPass(GetJString(env, path));
 }
 
+jint Java_org_citra_citra_1emu_NativeLibrary_importQueuedZipPass(JNIEnv* env, jobject thiz) {
+    return Core::importQueuedZipPass();
+}
+
 jint Java_org_citra_citra_1emu_NativeLibrary_exportZipPass(JNIEnv* env, jobject thiz,
                                                            jstring path) {
     return Core::exportZipPass(GetJString(env, path));
@@ -836,6 +855,17 @@ jboolean Java_org_citra_citra_1emu_NativeLibrary_onGamePadEvent([[maybe_unused]]
     }
 
     return static_cast<jboolean>(consumed);
+}
+
+jstring Java_org_citra_citra_1emu_NativeLibrary_getSystemUsername(JNIEnv* env,
+                                                                  [[maybe_unused]] jobject obj) {
+    auto& system = Core::System::GetInstance();
+    auto username = Service::CFG::GetModule(system)->GetUsername();
+    return ToJString(env, Common::UTF16ToUTF8(username));
+}
+
+void Java_org_citra_citra_1emu_NativeLibrary_resetProgramId(JNIEnv* env, jobject thiz) {
+    Loader::resetProgramId();
 }
 
 jboolean Java_org_citra_citra_1emu_NativeLibrary_onGamePadMoveEvent(
@@ -1188,6 +1218,7 @@ JNIEXPORT jboolean JNICALL Java_org_citra_citra_1emu_utils_NetPlayManager_melonL
     [[maybe_unused]] JNIEnv* env, [[maybe_unused]] jobject obj) {
     return multiplayer->MelonLANIsHost();
 }
+
 JNIEXPORT jobject JNICALL Java_org_citra_citra_1emu_utils_CiaInstallWorker_installCIA(
     JNIEnv* env, jobject jobj, jstring jpath) {
     std::string path = GetJString(env, jpath);
