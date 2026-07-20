@@ -879,8 +879,8 @@ class SettingsFragmentPresenter(private val fragmentView: SettingsFragmentView) 
                     IntListSetting.COMBO_BUTTON_BUTTONS,
                     R.string.combo_button_settings,
                     R.string.combo_button_settings_description,
-                    R.array.comboOptions,
-                    R.array.comboOptionValues,
+                    R.array.comboButtonOptions,
+                    R.array.comboButtonOptionValues,
                     IntListSetting.COMBO_BUTTON_BUTTONS.key,
                     IntListSetting.COMBO_BUTTON_BUTTONS.defaultValue
                 )

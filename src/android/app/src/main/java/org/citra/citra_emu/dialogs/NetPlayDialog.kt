@@ -551,8 +551,8 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
             // hindari indexOfFirst() mengembalikan -1 saat Join Room
             val preferedGameName = if (isCreateRoom) binding.dropdownPreferedGameName.text.toString() else ""
             val preferedGameId: Long = if (isCreateRoom) {
-                val idx = gameNameList.indexOfFirst { it[0] == preferedGameName }
-                if (idx >= 0) gameIdList[idx][0] else 0L
+                val idx = gameNameList.indexOfFirst { it == preferedGameName }
+                if (idx >= 0) gameIdList[idx] else 0L
             } else 0L
 
             val port = portStr.toIntOrNull() ?: run {
