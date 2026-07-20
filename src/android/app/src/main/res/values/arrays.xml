@@ -685,4 +685,39 @@
         <item>9</item>
     </integer-array>
 
+
+    <!-- Combo Button settings: pilihan tombol dan nilai native button ID-nya -->
+    <string-array name="comboButtonOptions">
+        <item>A</item>
+        <item>B</item>
+        <item>X</item>
+        <item>Y</item>
+        <item>L</item>
+        <item>R</item>
+        <item>ZL</item>
+        <item>ZR</item>
+        <item>Start</item>
+        <item>Select</item>
+        <item>D-Up</item>
+        <item>D-Down</item>
+        <item>D-Left</item>
+        <item>D-Right</item>
+    </string-array>
+    <integer-array name="comboButtonOptionValues">
+        <item>700</item>
+        <item>701</item>
+        <item>702</item>
+        <item>703</item>
+        <item>707</item>
+        <item>708</item>
+        <item>709</item>
+        <item>710</item>
+        <item>704</item>
+        <item>705</item>
+        <item>711</item>
+        <item>712</item>
+        <item>713</item>
+        <item>714</item>
+    </integer-array>
+
 </resources>
