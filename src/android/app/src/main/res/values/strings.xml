@@ -179,8 +179,6 @@
 	<string name="turbo_limit_hotkey">Turbo Speed</string>
 	<string name="turbo_enabled_toast">Turbo Speed Enabled</string>
 	<string name="turbo_disabled_toast">Turbo Speed Disabled</string>
-	<string name="combo_button_settings">Configure Combo Button</string>
-	<string name="combo_button_settings_description">Select which buttons are triggered by the Combo Button.</string>
 
 	<!-- System files strings -->
 	<string name="setup_system_files">System Files</string>
@@ -1048,6 +1046,21 @@
 	<string name="artic_base_connect_description">Connect to a real console that is running an Artic Base server</string>
 	<string name="artic_base_connect">Connect to Artic Base</string>
 	<string name="artic_base_enter_address">Enter Artic Base server address</string>
+
+    <!-- Combo Buttons -->
+    <string name="combo_button_settings">Combo Buttons</string>
+    <string name="combo_button_settings_description">Configure multi-button combo shortcuts for the overlay</string>
+
+
+    <!-- Combo Buttons -->
+    <string name="combo_button_none_assigned">(none)</string>
+    <string name="combo_clear_all">Clear all</string>
+    <string name="combo_button_max_exceeded" formatted="true">Max %d buttons per combo</string>
+    <string name="emulation_combo1_scale">Combo 1 Scale</string>
+    <string name="emulation_combo2_scale">Combo 2 Scale</string>
+    <string name="emulation_combo3_scale">Combo 3 Scale</string>
+    <string name="emulation_combo4_scale">Combo 4 Scale</string>
+    <string name="emulation_combo5_scale">Combo 5 Scale</string>
 
 	<!-- Quickload&Save-->
 	<string name="emulation_quicksave_slot">Quicksave</string>
