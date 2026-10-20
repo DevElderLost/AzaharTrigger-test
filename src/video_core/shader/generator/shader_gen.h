@@ -77,7 +77,7 @@ struct PicaGSConfigState {
     std::array<SemanticMap, 24> GetSemanticMaps() const;
 
     static consteval u64 StructHash() {
-        constexpr u64 STRUCT_VERSION = 0;
+        constexpr u64 STRUCT_VERSION = 1; // 1: planar shadow uniforms added to the geometry shader
 
         using T = PicaGSConfigState;
         return Common::HashCombine(STRUCT_VERSION,
@@ -121,7 +121,7 @@ struct PicaVSConfigState {
     PicaGSConfigState gs_state;
 
     static consteval u64 StructHash() {
-        constexpr u64 STRUCT_VERSION = 0;
+        constexpr u64 STRUCT_VERSION = 1; // 1: planar shadow uniforms added to the vertex shader
 
         using T = PicaVSConfigState;
         return Common::HashCombine(STRUCT_VERSION,

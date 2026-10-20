@@ -12,6 +12,7 @@ enum class StringSetting(
     override val defaultValue: String
 ) : AbstractStringSetting {
     INIT_TIME(SettingKeys.init_time(), Settings.SECTION_SYSTEM, "946731601"),
+    RESHADE_CONFIG_PATH(SettingKeys.reshade_config_path(), Settings.SECTION_RENDERER, ""),
     CAMERA_INNER_NAME(SettingKeys.camera_inner_name(), Settings.SECTION_CAMERA, "ndk"),
     CAMERA_INNER_CONFIG(SettingKeys.camera_inner_config(), Settings.SECTION_CAMERA, "_front"),
     CAMERA_OUTER_LEFT_NAME(SettingKeys.camera_outer_left_name(), Settings.SECTION_CAMERA, "ndk"),

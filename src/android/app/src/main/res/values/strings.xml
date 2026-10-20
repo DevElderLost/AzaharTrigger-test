@@ -179,8 +179,6 @@
 	<string name="turbo_limit_hotkey">Turbo Speed</string>
 	<string name="turbo_enabled_toast">Turbo Speed Enabled</string>
 	<string name="turbo_disabled_toast">Turbo Speed Disabled</string>
-	<string name="combo_button_settings">Configure Combo Button</string>
-	<string name="combo_button_settings_description">Select which buttons are triggered by the Combo Button.</string>
 
 	<!-- System files strings -->
 	<string name="setup_system_files">System Files</string>
@@ -341,6 +339,44 @@
 	<string name="internal_resolution_setting_10x">10x Native (4000x2400)</string>
 	<string name="performance_warning">Turning off this setting will significantly reduce emulation performance! For the best experience, it is recommended that you leave this setting enabled.</string>
 	<string name="debug_warning">Warning: Modifying these settings will slow emulation</string>
+	<string name="planar_shadows_header">Planar Shadows (Vulkan)</string>
+	<string name="planar_shadows">Planar shadows</string>
+	<string name="planar_shadows_description">Draw a flat shadow of the full character model (armor included) on the ground.</string>
+	<string name="planar_shadow_replace_original">Replace the game\'s shadows</string>
+	<string name="planar_shadow_replace_original_description">Remove the game\'s own shadow (the simplified polygon shadow) while planar shadows are on.</string>
+	<string name="planar_shadow_opacity">Shadow opacity</string>
+	<string name="planar_shadow_opacity_description">How dark the shadow is.</string>
+	<string name="planar_shadow_dir_x">Light direction: sideways</string>
+	<string name="planar_shadow_dir_x_description">Shadow offset to the right (negative: left) per unit of height, in hundredths.</string>
+	<string name="planar_shadow_dir_z">Light direction: depth</string>
+	<string name="planar_shadow_dir_z_description">Shadow offset away from the camera (negative: towards it) per unit of height, in hundredths.</string>
+	<string name="planar_shadow_pitch">Camera pitch</string>
+	<string name="planar_shadow_pitch_description">How far down the game camera looks. Orients the ground plane.</string>
+	<string name="planar_shadow_fov">Field of view</string>
+	<string name="planar_shadow_fov_description">Assumed vertical field of view of the game camera.</string>
+	<string name="planar_shadow_ground">Ground distance</string>
+	<string name="planar_shadow_ground_description">Distance from the camera to the ground, in game units. Raise it if shadows float above the ground, lower it if they sink.</string>
+	<string name="planar_shadow_mode">Shadow casters</string>
+	<string name="planar_shadow_mode_description">Which draws cast a shadow.</string>
+	<string name="planar_shadow_flip">Mirror axes</string>
+	<string name="planar_shadow_flip_description">Use if shadows point to the sky or are mirrored left/right for this game.</string>
+	<string name="planar_shadow_max_depth">Maximum distance</string>
+	<string name="planar_shadow_max_depth_description">No shadow beyond this view depth. 0 disables the limit.</string>
+	<string name="planar_shadow_mode_skinned">Skinned models only</string>
+	<string name="planar_shadow_mode_all">All opaque models</string>
+	<string name="planar_shadow_flip_none">None</string>
+	<string name="planar_shadow_flip_vertical">Vertical</string>
+	<string name="planar_shadow_flip_horizontal">Horizontal</string>
+	<string name="planar_shadow_flip_both">Both</string>
+	<string name="reshade_header">ReShade / vkBasalt (Vulkan)</string>
+	<string name="reshade_enabled">Enable post-processing</string>
+	<string name="reshade_enabled_description">Apply a vkBasalt/ReShade effect chain to the final image.</string>
+	<string name="reshade_config_path">Configuration file</string>
+	<string name="reshade_config_path_description">Path to a vkBasalt.conf or a ReShade preset (.ini). Filled in automatically by the import button.</string>
+	<string name="reshade_import">Import shaders</string>
+	<string name="reshade_import_description">Pick .fx / .fxh files, a ReShade preset or a vkBasalt.conf.</string>
+	<string name="reshade_import_done">Imported %1$d file(s)</string>
+	<string name="reshade_import_failed">Nothing was imported</string>
 	<string name="stereoscopy">Stereoscopy</string>
 	<string name="render3d">Stereoscopic 3D Mode</string>
 	<string name="render3d_description">Choose the stereoscopic 3D mode for 3D rendering. Side by Side modes are most common in modern use. Anaglyph and Interlaced modes will always apply to all connected displays.</string>
@@ -1048,6 +1084,21 @@
 	<string name="artic_base_connect_description">Connect to a real console that is running an Artic Base server</string>
 	<string name="artic_base_connect">Connect to Artic Base</string>
 	<string name="artic_base_enter_address">Enter Artic Base server address</string>
+
+    <!-- Combo Buttons -->
+    <string name="combo_button_settings">Combo Buttons</string>
+    <string name="combo_button_settings_description">Configure multi-button combo shortcuts for the overlay</string>
+
+
+    <!-- Combo Buttons -->
+    <string name="combo_button_none_assigned">(none)</string>
+    <string name="combo_clear_all">Clear all</string>
+    <string name="combo_button_max_exceeded" formatted="true">Max %d buttons per combo</string>
+    <string name="emulation_combo1_scale">Combo 1 Scale</string>
+    <string name="emulation_combo2_scale">Combo 2 Scale</string>
+    <string name="emulation_combo3_scale">Combo 3 Scale</string>
+    <string name="emulation_combo4_scale">Combo 4 Scale</string>
+    <string name="emulation_combo5_scale">Combo 5 Scale</string>
 
 	<!-- Quickload&Save-->
 	<string name="emulation_quicksave_slot">Quicksave</string>

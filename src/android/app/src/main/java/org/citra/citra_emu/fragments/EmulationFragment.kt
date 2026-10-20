@@ -878,13 +878,28 @@ class EmulationFragment :
                     true
                 }
 
-                R.id.menu_emulation_adjust_scale_button_turbo -> {
-                    showAdjustScaleDialog("controlScale-" + NativeLibrary.ButtonType.BUTTON_TURBO)
+                R.id.menu_emulation_adjust_scale_combo_1 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_1)
                     true
                 }
 
-                R.id.menu_emulation_adjust_scale_button_combo -> {
-                    showAdjustScaleDialog("controlScale-" + Hotkey.COMBO_BUTTON.button)
+                R.id.menu_emulation_adjust_scale_combo_2 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_2)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_3 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_3)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_4 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_4)
+                    true
+                }
+
+                R.id.menu_emulation_adjust_scale_combo_5 -> {
+                    showAdjustScaleDialog("controlScale-" + org.citra.citra_emu.overlay.ComboButtonManager.COMBO_BUTTON_5)
                     true
                 }
 
@@ -1321,13 +1336,14 @@ class EmulationFragment :
 
     private fun showToggleControlsDialog() {
         val editor = preferences.edit()
-        val enabledButtons = BooleanArray(17)
+        // Indices 0-15  = tombol standar 3DS
+        // Indices 16-20 = Combo Button 1-5
+        val enabledButtons = BooleanArray(21)
         enabledButtons.forEachIndexed { i: Int, _: Boolean ->
-            // Buttons that are disabled by default
             var defaultValue = true
             when (i) {
-                // TODO: Remove these magic numbers
-                6, 7, 12, 13, 14, 15, 16 -> defaultValue = false
+                // Disabled by default: turbo, swap, home, extra, combo buttons
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
             }
             enabledButtons[i] = preferences.getBoolean("buttonToggle$i", defaultValue)
         }
@@ -1339,6 +1355,7 @@ class EmulationFragment :
                 enabledButtons
             ) { _: DialogInterface?, indexSelected: Int, isChecked: Boolean ->
                 editor.putBoolean("buttonToggle$indexSelected", isChecked)
+
             }
             .setPositiveButton(android.R.string.ok) { _: DialogInterface?, _: Int ->
                 editor.apply()
@@ -1533,15 +1550,18 @@ class EmulationFragment :
             .apply()
 
         val editor = preferences.edit()
-        // TODO: This code sucks balls. We need to do this differently. -OS
-        for (i in 0 until 17) {
+        for (i in 0 until 21) {
             var defaultValue = true
             when (i) {
-                6, 7, 12, 13, 14, 15, 16 -> defaultValue = false
+                6, 7, 12, 13, 14, 15, 16, 17, 18, 19, 20 -> defaultValue = false
             }
             editor.putBoolean("buttonToggle$i", defaultValue)
         }
         editor.apply()
+        // Reset combo button enabled states
+        for (slot in 1..5) {
+            org.citra.citra_emu.overlay.ComboButtonManager.setEnabled(slot, false)
+        }
 
         binding.surfaceInputOverlay.resetButtonPlacement()
     }

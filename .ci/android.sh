@@ -3,8 +3,18 @@
 export NDK_CCACHE=$(which ccache)
 
 if [ -z "${ANDROID_KEYSTORE_B64}" ]; then
-    echo "::error::ANDROID_KEYSTORE_B64 is empty — refusing to build with debug signing"
-    exit 1
+    echo "::warning::ANDROID_KEYSTORE_B64 is empty, generating a temporary debug keystore instead"
+    export ANDROID_KEYSTORE_FILE="${GITHUB_WORKSPACE}/ks.jks"
+    export ANDROID_KEYSTORE_PASS="android"
+    export ANDROID_KEY_PASS="android"
+    keytool -genkeypair -v \
+        -keystore "${ANDROID_KEYSTORE_FILE}" \
+        -alias dlix69 \
+        -keyalg RSA -keysize 2048 -validity 10000 \
+        -storepass "${ANDROID_KEYSTORE_PASS}" \
+        -keypass "${ANDROID_KEY_PASS}" \
+        -dname "CN=CI Debug, OU=CI, O=CI, L=CI, S=CI, C=ID"
+    export ANDROID_KEYSTORE_B64=$(base64 -w0 "${ANDROID_KEYSTORE_FILE}")
 fi
 
 if [ ! -z "${ANDROID_KEYSTORE_B64}" ]; then

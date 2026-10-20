@@ -79,13 +79,37 @@
             <item
                 android:id="@+id/menu_emulation_adjust_scale_button_swap"
                 android:title="@string/button_swap" />
-            <item
-                android:id="@+id/menu_emulation_adjust_scale_button_turbo"
-                android:title="@string/button_turbo" />
-            <item
-                android:id="@+id/menu_emulation_adjust_scale_button_combo"
-                android:title="@string/button_combo" />
-        </menu>
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_1"
+                    android:title="@string/emulation_combo1_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_2"
+                    android:title="@string/emulation_combo2_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_3"
+                    android:title="@string/emulation_combo3_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_4"
+                    android:title="@string/emulation_combo4_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_5"
+                    android:title="@string/emulation_combo5_scale" />
+                        <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_1"
+                    android:title="@string/emulation_combo1_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_2"
+                    android:title="@string/emulation_combo2_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_3"
+                    android:title="@string/emulation_combo3_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_4"
+                    android:title="@string/emulation_combo4_scale" />
+                <item
+                    android:id="@+id/menu_emulation_adjust_scale_combo_5"
+                    android:title="@string/emulation_combo5_scale" />
+</menu>
     </item>
 
     <item

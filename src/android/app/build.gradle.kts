@@ -26,15 +26,33 @@ val abiFilter = listOf("arm64-v8a", "x86_64")
 
 fun getFixedVersionCode(versionName: String): Int {
     val parts = versionName.split(".")
-    val major = if (parts.size > 0) parts[0].toIntOrNull() ?: 0 else 0
-    val minor = if (parts.size > 1) parts[1].toIntOrNull() ?: 0 else 0
-    val patch = if (parts.size > 2) parts[2].toIntOrNull() ?: 0 else 0
+
+    // Require a proper major.minor.patch format (e.g. from a real tag like "1.2.3").
+    // If it's not in that shape (e.g. a raw commit hash when no tags exist), fall back.
+    if (parts.size < 3) {
+        return autoVersion
+    }
+
+    val major = parts[0].toIntOrNull()
+    val minor = parts[1].toIntOrNull()
+    val patch = parts[2].toIntOrNull()
+
+    if (major == null || minor == null || patch == null) {
+        return autoVersion
+    }
 
     if (major == 0 && minor == 0 && patch == 0) {
         return autoVersion
     }
-    
-    return major * 1000000 + minor * 10000 + patch * 100
+
+    // Use Long math and range-check to guard against Int overflow (which would
+    // otherwise silently wrap into a negative versionCode and fail the Android build).
+    val code = major.toLong() * 1000000 + minor.toLong() * 10000 + patch.toLong() * 100
+    if (code <= 0 || code > Int.MAX_VALUE) {
+        return autoVersion
+    }
+
+    return code.toInt()
 }
 
 val downloadedJniLibsPath = "${layout.buildDirectory.get().asFile.path}/downloadedJniLibs"

@@ -2,6 +2,7 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include "video_core/planar_shadows.h"
 #include "video_core/shader/generator/pica_fs_config.h"
 
 namespace Pica::Shader {
@@ -107,7 +108,9 @@ LightConfig::LightConfig(const Pica::LightingRegs& regs) {
     bump_renorm.Assign(regs.config0.disable_bump_renorm == 0);
     clamp_highlights.Assign(regs.config0.clamp_highlights != 0);
 
-    enable_shadow.Assign(regs.config0.enable_shadow != 0);
+    // Planar shadows replace the shadow map lookup of the game
+    enable_shadow.Assign(regs.config0.enable_shadow != 0 &&
+                         !VideoCore::PlanarShadowReplacesOriginal());
     if (enable_shadow) {
         shadow_primary.Assign(regs.config0.shadow_primary != 0);
         shadow_secondary.Assign(regs.config0.shadow_secondary != 0);

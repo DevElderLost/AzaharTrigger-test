@@ -35,7 +35,36 @@ layout (binding = 1, std140) uniform vs_data {
     bool enable_clip1;
     bool flip_viewport;
     vec4 clip_coef;
+    vec4 shadow_params;
+    vec4 shadow_normal;
+    vec4 shadow_direction;
 };
+
+// Flattens the vertex onto the planar shadow ground plane. The view space is rebuilt from the
+// clip space position: the PICA framebuffer is rotated, so clip x is the screen vertical axis
+// and clip y the screen horizontal one, and clip w is the distance along the view axis.
+vec4 ApplyPlanarShadow(vec4 p) {
+    if (shadow_params.x < 0.5) {
+        return p;
+    }
+    const vec4 kHidden = vec4(0.0, 0.0, 2.0, 1.0);
+    float max_depth = shadow_normal.w;
+    if (p.w <= 0.0 || (max_depth > 0.0 && p.w > max_depth)) {
+        return kHidden;
+    }
+    vec3 v = vec3(p.y * shadow_params.z, p.x * shadow_params.y, -p.w);
+    // Distance of the point above the ground plane n.x = -ground_distance
+    float height = shadow_params.w + dot(shadow_normal.xyz, v);
+    vec3 s = v + max(height, 0.0) * shadow_direction.xyz;
+    float nw = -s.z;
+    if (nw <= 0.001) {
+        return kHidden;
+    }
+    // PICA depth is z = a * z_view + b with a close to 1, move it with the point and pull it
+    // slightly towards the camera so the shadow wins against the ground it lies on.
+    float nz = p.z + (s.z - v.z) + 0.0001 * nw;
+    return vec4(s.y / shadow_params.y, s.x / shadow_params.z, nz, nw);
+}
 
 const vec2 EPSILON_Z = vec2(0.000001f, -1.00001f);
 
@@ -242,6 +271,7 @@ std::string GenerateVertexShader(const ShaderSetup& setup, const PicaVSConfig& c
                semantic(VSOutputAttributes::POSITION_Z) + ", " +
                semantic(VSOutputAttributes::POSITION_W) + ");\n";
         out += "    vtx_pos = SanitizeVertex(vtx_pos);\n";
+        out += "    vtx_pos = ApplyPlanarShadow(vtx_pos);\n";
         out += "    if (flip_viewport) {\n";
         out += "        vtx_pos.y = -vtx_pos.y;\n";
         out += "    }\n";
@@ -344,6 +374,7 @@ struct Vertex {
            semantic(VSOutputAttributes::POSITION_Z) + ", " +
            semantic(VSOutputAttributes::POSITION_W) + ");\n";
     out += "    vtx_pos = SanitizeVertex(vtx_pos);\n";
+    out += "    vtx_pos = ApplyPlanarShadow(vtx_pos);\n";
     out += "    if (flip_viewport) {\n";
     out += "        vtx_pos.y = -vtx_pos.y;\n";
     out += "    }\n";

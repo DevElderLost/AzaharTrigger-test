@@ -104,6 +104,13 @@ enum class BooleanSetting(
     ),
     USE_FRAME_LIMIT(SettingKeys.use_frame_limit(), Settings.SECTION_RENDERER, true),
     DEBUG_RENDERER(SettingKeys.renderer_debug(), Settings.SECTION_DEBUG, false),
+    PLANAR_SHADOWS(SettingKeys.planar_shadows(), Settings.SECTION_RENDERER, false),
+    PLANAR_SHADOW_REPLACE_ORIGINAL(
+        SettingKeys.planar_shadow_replace_original(),
+        Settings.SECTION_RENDERER,
+        true
+    ),
+    RESHADE_ENABLED(SettingKeys.reshade_enabled(), Settings.SECTION_RENDERER, false),
     DISABLE_RIGHT_EYE_RENDER(
         SettingKeys.disable_right_eye_render(),
         Settings.SECTION_RENDERER,

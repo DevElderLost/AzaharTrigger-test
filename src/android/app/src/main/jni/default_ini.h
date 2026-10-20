@@ -197,6 +197,54 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # Loaded from shaders/anaglyph
 )") DECLARE_KEY(anaglyph_shader_name) BOOST_HANA_STRING(R"(
 
+# Planar shadows (Vulkan only). Re-draws skinned (or all opaque) 3D draws flattened onto an
+# assumed ground plane and darkens the framebuffer there.
+# false (default): Off, true: On
+)") DECLARE_KEY(planar_shadows) BOOST_HANA_STRING(R"(
+
+# Shadow opacity in percent. 0 - 60, 25 (default)
+)") DECLARE_KEY(planar_shadow_opacity) BOOST_HANA_STRING(R"(
+
+# Shadow direction in hundredths of a view-space unit per unit of height (right/left).
+# -200 - 200, 45 (default)
+)") DECLARE_KEY(planar_shadow_dir_x) BOOST_HANA_STRING(R"(
+
+# Shadow direction in hundredths of a view-space unit per unit of height (away/towards camera).
+# -200 - 200, 30 (default)
+)") DECLARE_KEY(planar_shadow_dir_z) BOOST_HANA_STRING(R"(
+
+# Assumed camera pitch (degrees looking down) used to orient the ground plane. 0 - 89, 35 (default)
+)") DECLARE_KEY(planar_shadow_pitch) BOOST_HANA_STRING(R"(
+
+# Assumed vertical field of view (degrees) used to rebuild view space. 10 - 120, 40 (default)
+)") DECLARE_KEY(planar_shadow_fov) BOOST_HANA_STRING(R"(
+
+# Distance from the camera to the ground plane, in game units. 1 - 1000, 10 (default)
+)") DECLARE_KEY(planar_shadow_ground) BOOST_HANA_STRING(R"(
+
+# Which draws cast shadows.
+# 0 (default): Only draws whose vertex shader uses relative addressing (skinned meshes)
+# 1: Every opaque draw that writes depth
+)") DECLARE_KEY(planar_shadow_mode) BOOST_HANA_STRING(R"(
+
+# Remove the game's own shadows while planar shadows are on. true (default), false
+)") DECLARE_KEY(planar_shadow_replace_original) BOOST_HANA_STRING(R"(
+
+# Mirror the shadow axes: bit 0 flips the screen vertical axis, bit 1 the horizontal axis.
+# 0 (default) - 3
+)") DECLARE_KEY(planar_shadow_flip) BOOST_HANA_STRING(R"(
+
+# View depth beyond which no shadow is drawn. 0 (default): No limit
+)") DECLARE_KEY(planar_shadow_max_depth) BOOST_HANA_STRING(R"(
+
+# Enable the vkBasalt/ReShade post processing chain (Vulkan only)
+# false (default): Off, true: On
+)") DECLARE_KEY(reshade_enabled) BOOST_HANA_STRING(R"(
+
+# Path to a vkBasalt.conf or a ReShade preset (.ini) describing the effect chain.
+# Files imported through the shader importer live in <user>/shaders/reshade
+)") DECLARE_KEY(reshade_config_path) BOOST_HANA_STRING(R"(
+
 # Whether to enable linear filtering or not
 # This is required for some shaders to work correctly
 # 0: Nearest, 1 (default): Linear

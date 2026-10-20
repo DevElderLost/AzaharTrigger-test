@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "video_core/planar_shadows.h"
 #include "video_core/rasterizer_accelerated.h"
 #include "video_core/renderer_vulkan/vk_descriptor_update_queue.h"
 #include "video_core/renderer_vulkan/vk_pipeline_cache.h"
@@ -95,6 +96,12 @@ private:
     /// Internal implementation for AccelerateDrawBatch
     bool AccelerateDrawBatchInternal(bool is_indexed);
 
+    /// Returns true when the draw that was just issued should also cast a planar shadow
+    bool ShouldCastPlanarShadow(bool using_color_fb, bool write_depth_fb);
+
+    /// Re-issues the current accelerated draw flattened onto the planar shadow ground plane
+    void DrawPlanarShadow(bool is_indexed);
+
     /// Setup index array for AccelerateDrawBatch
     void SetupIndexArray();
 
@@ -128,6 +135,14 @@ private:
     std::array<vk::Buffer, 16> vertex_buffers;
     VertexArrayInfo vertex_info;
     PipelineInfo pipeline_info{};
+
+    // Planar shadows, see video_core/planar_shadows.h
+    VideoCore::PlanarShadowOptions shadow_options{};
+    VideoCore::SkinnedProgramCache skinned_programs;
+    u32 shadow_refresh_counter{};
+    u32 shadow_draws_skipped{};
+    u32 shadow_casters_drawn{};
+    u32 shadow_log_counter{};
 
     StreamBuffer stream_buffer;     ///< Vertex+Index buffer
     StreamBuffer uniform_buffer;    ///< Uniform buffer

@@ -87,6 +87,19 @@ object SettingKeys {
     external fun filter_mode(): String
     external fun pp_shader_name(): String
     external fun anaglyph_shader_name(): String
+    external fun planar_shadows(): String
+    external fun planar_shadow_opacity(): String
+    external fun planar_shadow_dir_x(): String
+    external fun planar_shadow_dir_z(): String
+    external fun planar_shadow_pitch(): String
+    external fun planar_shadow_fov(): String
+    external fun planar_shadow_ground(): String
+    external fun planar_shadow_mode(): String
+    external fun planar_shadow_flip(): String
+    external fun planar_shadow_replace_original(): String
+    external fun planar_shadow_max_depth(): String
+    external fun reshade_enabled(): String
+    external fun reshade_config_path(): String
     external fun dump_textures(): String
     external fun custom_textures(): String
     external fun preload_textures(): String
