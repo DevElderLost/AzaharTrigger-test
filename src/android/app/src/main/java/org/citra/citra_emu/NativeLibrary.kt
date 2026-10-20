@@ -755,6 +755,13 @@ object NativeLibrary {
 
     external fun initMultiplayer()
 
+    /**
+     * Imports ReShade/vkBasalt shaders (.fx/.fxh, a preset .ini, a vkBasalt.conf or a folder
+     * containing them) given as a real file system path. Returns the vkBasalt.conf to use as the
+     * reshade_config_path setting, or an empty string if nothing was imported.
+     */
+    external fun importReShadeShaders(path: String): String
+
     @Keep
     @JvmStatic
     fun createFile(directory: String, filename: String): Boolean =

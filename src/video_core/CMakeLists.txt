@@ -15,6 +15,12 @@ add_library(video_core STATIC EXCLUDE_FROM_ALL
     gpu_impl.h
     pica_types.h
     precompiled_headers.h
+    planar_shadows.cpp
+    post_process/chain_config.cpp
+    post_process/chain_config.h
+    post_process/reshade_fx.cpp
+    post_process/reshade_fx.h
+    planar_shadows.h
     rasterizer_accelerated.cpp
     rasterizer_accelerated.h
     rasterizer_interface.h
@@ -182,6 +188,8 @@ if (ENABLE_VULKAN)
         renderer_vulkan/vk_instance.cpp
         renderer_vulkan/vk_instance.h
         renderer_vulkan/vk_pipeline_cache.cpp
+        renderer_vulkan/vk_postprocess.cpp
+        renderer_vulkan/vk_postprocess.h
         renderer_vulkan/vk_pipeline_cache.h
         $<$<NOT:$<BOOL:${ENABLE_LIBRETRO}>>:renderer_vulkan/vk_platform.cpp>
         renderer_vulkan/vk_platform.h

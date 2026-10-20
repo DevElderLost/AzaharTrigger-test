@@ -72,8 +72,12 @@ struct VSUniformData {
     u32 enable_clip1;
     u32 flip_viewport;
     alignas(16) Common::Vec4f clip_coef;
+    // Planar shadows, see video_core/planar_shadows.h. shadow_params.x == 0 disables the effect.
+    alignas(16) Common::Vec4f shadow_params;
+    alignas(16) Common::Vec4f shadow_normal;
+    alignas(16) Common::Vec4f shadow_direction;
 };
-static_assert(sizeof(VSUniformData) == 32,
+static_assert(sizeof(VSUniformData) == 80,
               "The size of the VSUniformData does not match the structure in the shader");
 static_assert(sizeof(VSUniformData) < 16384,
               "VSUniformData structure must be less than 16kb as per the OpenGL spec");

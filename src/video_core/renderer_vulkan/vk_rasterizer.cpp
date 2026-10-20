@@ -2,6 +2,7 @@
 // Licensed under GPLv2 or any later version
 // Refer to the license.txt file included.
 
+#include <algorithm>
 #include "common/alignment.h"
 #include "common/literals.h"
 #include "common/logging/log.h"
@@ -12,6 +13,7 @@
 #include "core/loader/loader.h"
 #include "core/memory.h"
 #include "video_core/pica/pica_core.h"
+#include "video_core/planar_shadows.h"
 #include "video_core/renderer_vulkan/renderer_vulkan.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -621,8 +623,111 @@ bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
         });
     }
 
+    if (accelerate && succeeded && ShouldCastPlanarShadow(using_color_fb, write_depth_fb)) {
+        DrawPlanarShadow(is_indexed);
+    }
+
     vertex_batch.clear();
     return succeeded;
+}
+
+bool RasterizerVulkan::ShouldCastPlanarShadow(bool using_color_fb, bool write_depth_fb) {
+    // The options are refreshed every few draws, reading all the settings per draw is wasteful
+    if ((shadow_refresh_counter++ & 0x7F) == 0) {
+        shadow_options = VideoCore::PlanarShadowOptions::FromSettings();
+    }
+    if (!shadow_options.enabled || shadow_options.opacity <= 0.0f) {
+        return false;
+    }
+
+    // Only opaque color + depth writing draws into one of the two screens cast shadows. The
+    // framebuffer is rotated, a screen is 240 wide and 400 (top) or 320 (bottom) tall.
+    const auto& fb = regs.framebuffer.framebuffer;
+    const u32 width = fb.GetWidth();
+    const u32 height = fb.GetHeight();
+    if (!using_color_fb || !write_depth_fb || width != 240 || (height != 400 && height != 320)) {
+        return false;
+    }
+    if (regs.framebuffer.IsShadowRendering() ||
+        pipeline_info.state.blending.blend_enable != 0 ||
+        !pipeline_info.state.depth_stencil.depth_test_enable) {
+        return false;
+    }
+    // Skip tiny draws, they are props and particles
+    if (regs.pipeline.num_vertices < 24) {
+        return false;
+    }
+    if (shadow_options.all_opaque_draws) {
+        return true;
+    }
+    auto& setup = pica.vs_setup;
+    return skinned_programs.IsSkinned(setup.GetProgramCodeHash(), setup.GetProgramCode(),
+                                      setup.GetBiggestProgramSize());
+}
+
+void RasterizerVulkan::DrawPlanarShadow(bool is_indexed) {
+    using Pica::FramebufferRegs;
+
+    const auto& fb = regs.framebuffer.framebuffer;
+    const float aspect = static_cast<float>(fb.GetHeight()) / static_cast<float>(fb.GetWidth());
+    const auto uniforms = VideoCore::BuildPlanarShadowUniforms(shadow_options, aspect);
+
+    const PipelineInfo saved_info = pipeline_info;
+    const VSUniformData saved_vs_data = vs_data;
+
+    vs_data.shadow_params = {uniforms.params[0], uniforms.params[1], uniforms.params[2],
+                             uniforms.params[3]};
+    vs_data.shadow_normal = {uniforms.normal[0], uniforms.normal[1], uniforms.normal[2],
+                             uniforms.normal[3]};
+    vs_data.shadow_direction = {uniforms.direction[0], uniforms.direction[1],
+                                uniforms.direction[2], uniforms.direction[3]};
+    vs_data_dirty = true;
+    UploadUniforms(true);
+
+    // dst = dst * (1 - opacity): ignore the shader output and blend with a constant alpha.
+    auto& blending = pipeline_info.state.blending;
+    blending.blend_enable = 1;
+    blending.logic_op = FramebufferRegs::LogicOp::Copy;
+    blending.color_write_mask &= 0x7; // Never touch alpha
+    blending.src_color_blend_factor.Assign(FramebufferRegs::BlendFactor::Zero);
+    blending.dst_color_blend_factor.Assign(FramebufferRegs::BlendFactor::OneMinusConstantAlpha);
+    blending.color_blend_eq.Assign(FramebufferRegs::BlendEquation::Add);
+    blending.src_alpha_blend_factor.Assign(FramebufferRegs::BlendFactor::Zero);
+    blending.dst_alpha_blend_factor.Assign(FramebufferRegs::BlendFactor::One);
+    blending.alpha_blend_eq.Assign(FramebufferRegs::BlendEquation::Add);
+    const u32 alpha = static_cast<u32>(std::clamp(shadow_options.opacity, 0.0f, 1.0f) * 255.0f);
+    pipeline_info.dynamic_info.blend_color = alpha << 24;
+
+    // The silhouette winding is not preserved by the projection
+    pipeline_info.state.rasterization.cull_mode.Assign(Pica::RasterizerRegs::CullMode::KeepAll);
+
+    // Test against the scene but never write depth
+    auto& depth_stencil = pipeline_info.state.depth_stencil;
+    depth_stencil.depth_test_enable.Assign(1);
+    depth_stencil.depth_write_enable.Assign(0);
+    depth_stencil.depth_compare_op.Assign(FramebufferRegs::CompareFunc::LessThanOrEqual);
+
+    // Darken every pixel once, overlapping triangles of the silhouette must not accumulate. The
+    // stencil buffer is only used for this when the game does not use it itself.
+    const bool game_stencil = saved_info.state.depth_stencil.stencil_test_enable != 0;
+    if (regs.framebuffer.HasStencil() && !game_stencil) {
+        depth_stencil.stencil_test_enable.Assign(1);
+        depth_stencil.stencil_compare_op.Assign(FramebufferRegs::CompareFunc::Equal);
+        depth_stencil.stencil_pass_op.Assign(FramebufferRegs::StencilAction::Increment);
+        depth_stencil.stencil_fail_op.Assign(FramebufferRegs::StencilAction::Keep);
+        depth_stencil.stencil_depth_fail_op.Assign(FramebufferRegs::StencilAction::Keep);
+        pipeline_info.dynamic_info.stencil_reference = 0;
+        pipeline_info.dynamic_info.stencil_compare_mask = 0xFF;
+        pipeline_info.dynamic_info.stencil_write_mask = 0xFF;
+    } else {
+        depth_stencil.stencil_test_enable.Assign(0);
+    }
+
+    AccelerateDrawBatchInternal(is_indexed);
+
+    pipeline_info = saved_info;
+    vs_data = saved_vs_data;
+    vs_data_dirty = true;
 }
 
 void RasterizerVulkan::SyncTextureUnits(const Framebuffer* framebuffer) {

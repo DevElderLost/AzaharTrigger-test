@@ -11,6 +11,7 @@
 #include "citra_libretro/libretro_vk.h"
 #else
 #include "video_core/renderer_vulkan/vk_instance.h"
+#include "video_core/renderer_vulkan/vk_postprocess.h"
 #include "video_core/renderer_vulkan/vk_present_window.h"
 #endif
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -134,6 +135,7 @@ private:
     DescriptorUpdateQueue update_queue;
     RasterizerVulkan rasterizer;
     std::unique_ptr<PresentWindow> secondary_present_window_ptr;
+    std::unique_ptr<PostProcessChain> post_process_chain; ///< vkBasalt/ReShade chain, main window
     DescriptorHeap present_heap;
     vk::UniquePipelineLayout present_pipeline_layout;
     std::array<vk::Pipeline, PRESENT_PIPELINES> present_pipelines;

@@ -79,6 +79,7 @@
 #include "multiplayer.h"
 #include "video_core/debug_utils/debug_utils.h"
 #include "video_core/gpu.h"
+#include "video_core/post_process/chain_config.h"
 #include "video_core/renderer_base.h"
 
 namespace {
@@ -466,6 +467,21 @@ void JNICALL Java_org_citra_citra_1emu_NativeLibrary_initializeGpuDriver(
     jstring custom_driver_name, jstring file_redirect_dir) {
     InitializeGpuDriver(GetJString(env, hook_lib_dir), GetJString(env, custom_driver_dir),
                         GetJString(env, custom_driver_name), GetJString(env, file_redirect_dir));
+}
+
+/// Imports ReShade/vkBasalt shaders (.fx/.fxh, preset .ini, vkBasalt.conf or a folder) into
+/// <user>/shaders/reshade. Returns the vkBasalt.conf to use as reshade_config_path, or an empty
+/// string when nothing was imported.
+jstring Java_org_citra_citra_1emu_NativeLibrary_importReShadeShaders(JNIEnv* env,
+                                                                     [[maybe_unused]] jobject obj,
+                                                                     jstring j_path) {
+    const auto result = PostProcess::ImportShaders(GetJString(env, j_path),
+                                                   PostProcess::GetReShadeRoot());
+    for (const auto& message : result.messages) {
+        LOG_WARNING(Frontend, "ReShade import: {}", message);
+    }
+    LOG_INFO(Frontend, "ReShade import: {} file(s) copied", result.files_copied);
+    return ToJString(env, result.ok ? result.config_path.string() : std::string{});
 }
 
 void Java_org_citra_citra_1emu_NativeLibrary_notifyOrientationChange([[maybe_unused]] JNIEnv* env,

@@ -129,6 +129,8 @@ RendererVulkan::RendererVulkan(Core::System& system, Pica::PicaCore& pica_,
     CompileShaders();
     BuildLayouts();
     BuildPipelines();
+    post_process_chain = std::make_unique<PostProcessChain>(
+        instance, scheduler, main_present_window.GetSurfaceFormat());
     if (secondary_window) {
         secondary_present_window_ptr = std::make_unique<PresentWindow>(
             *secondary_window, instance, scheduler, IsLowRefreshRate());
@@ -140,6 +142,7 @@ RendererVulkan::~RendererVulkan() {
     scheduler.Finish();
     main_present_window.WaitPresent();
     device.waitIdle();
+    post_process_chain.reset();
 
     device.destroyShaderModule(present_vertex_shader);
     for (u32 i = 0; i < PRESENT_PIPELINES; i++) {
@@ -252,6 +255,9 @@ void RendererVulkan::RenderToWindow(PresentWindow& window, const Layout::Framebu
         clear_color.float32[3] = 1.0f;
 
         DrawScreens(frame, layout, flipped);
+        if (&window == &main_present_window && post_process_chain) {
+            post_process_chain->Apply(frame);
+        }
         scheduler.Flush(frame->render_ready);
         window.Present(frame);
         if ((secondaryWindowEnabled && isSecondaryWindow) || (!secondaryWindowEnabled)) {

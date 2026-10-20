@@ -173,6 +173,18 @@ void Config::ReadValues() {
     Settings::values.pp_shader_name =
         android_config->GetString("Renderer", "pp_shader_name", default_shader);
     ReadSetting("Renderer", Settings::values.filter_mode);
+    ReadSetting("Renderer", Settings::values.planar_shadows);
+    ReadSetting("Renderer", Settings::values.reshade_enabled);
+    ReadSetting("Renderer", Settings::values.planar_shadow_opacity);
+    ReadSetting("Renderer", Settings::values.planar_shadow_dir_x);
+    ReadSetting("Renderer", Settings::values.planar_shadow_dir_z);
+    ReadSetting("Renderer", Settings::values.planar_shadow_pitch);
+    ReadSetting("Renderer", Settings::values.planar_shadow_fov);
+    ReadSetting("Renderer", Settings::values.planar_shadow_ground);
+    ReadSetting("Renderer", Settings::values.planar_shadow_mode);
+    ReadSetting("Renderer", Settings::values.planar_shadow_max_depth);
+    ReadSetting("Renderer", Settings::values.planar_shadow_flip);
+    ReadSetting("Renderer", Settings::values.reshade_config_path);
     ReadSetting("Renderer", Settings::values.use_integer_scaling);
 
     ReadSetting("Renderer", Settings::values.bg_red);

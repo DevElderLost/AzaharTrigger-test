@@ -628,6 +628,30 @@ struct Values {
     SwitchableSetting<std::string> anaglyph_shader_name{"Dubois (builtin)",
                                                         Keys::anaglyph_shader_name};
 
+    // Planar shadows (Vulkan only). Casters are re-drawn flattened onto an assumed ground plane
+    // that is described in camera space. See video_core/planar_shadows.h.
+    SwitchableSetting<bool> planar_shadows{false, Keys::planar_shadows};
+    SwitchableSetting<s32, true> planar_shadow_opacity{25, 0, 60, Keys::planar_shadow_opacity};
+    SwitchableSetting<s32, true> planar_shadow_dir_x{45, -200, 200, Keys::planar_shadow_dir_x};
+    SwitchableSetting<s32, true> planar_shadow_dir_z{30, -200, 200, Keys::planar_shadow_dir_z};
+    SwitchableSetting<s32, true> planar_shadow_pitch{35, 0, 89, Keys::planar_shadow_pitch};
+    SwitchableSetting<s32, true> planar_shadow_fov{40, 10, 120, Keys::planar_shadow_fov};
+    SwitchableSetting<s32, true> planar_shadow_ground{10, 1, 1000, Keys::planar_shadow_ground};
+    // 0: only draws whose vertex shader uses relative addressing (skinned meshes), 1: every
+    // opaque draw that writes depth
+    SwitchableSetting<s32, true> planar_shadow_mode{0, 0, 1, Keys::planar_shadow_mode};
+    // Bit 0 mirrors the screen vertical axis, bit 1 the horizontal one. Use when shadows are
+    // projected towards the sky or mirrored left/right for a game.
+    SwitchableSetting<s32, true> planar_shadow_flip{0, 0, 3, Keys::planar_shadow_flip};
+    // View depth beyond which no shadow is drawn, 0 disables the limit
+    SwitchableSetting<s32, true> planar_shadow_max_depth{0, 0, 10000,
+                                                         Keys::planar_shadow_max_depth};
+
+    // vkBasalt/ReShade post processing chain (Vulkan only)
+    SwitchableSetting<bool> reshade_enabled{false, Keys::reshade_enabled};
+    // Path to a vkBasalt.conf or to a ReShade preset (.ini)
+    SwitchableSetting<std::string> reshade_config_path{"", Keys::reshade_config_path};
+
     SwitchableSetting<bool> dump_textures{false, Keys::dump_textures};
     SwitchableSetting<bool> custom_textures{false, Keys::custom_textures};
     SwitchableSetting<bool> preload_textures{false, Keys::preload_textures};
