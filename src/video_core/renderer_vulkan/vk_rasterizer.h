@@ -140,6 +140,9 @@ private:
     VideoCore::PlanarShadowOptions shadow_options{};
     VideoCore::SkinnedProgramCache skinned_programs;
     u32 shadow_refresh_counter{};
+    u32 shadow_draws_skipped{};
+    u32 shadow_casters_drawn{};
+    u32 shadow_log_counter{};
 
     StreamBuffer stream_buffer;     ///< Vertex+Index buffer
     StreamBuffer uniform_buffer;    ///< Uniform buffer

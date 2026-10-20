@@ -559,6 +559,7 @@ void QtConfig::ReadLayoutValues() {
     ReadGlobalSetting(Settings::values.planar_shadow_mode);
     ReadGlobalSetting(Settings::values.planar_shadow_max_depth);
     ReadGlobalSetting(Settings::values.planar_shadow_flip);
+    ReadGlobalSetting(Settings::values.planar_shadow_replace_original);
     ReadGlobalSetting(Settings::values.reshade_config_path);
     ReadGlobalSetting(Settings::values.anaglyph_shader_name);
     ReadGlobalSetting(Settings::values.layout_option);
@@ -1174,6 +1175,7 @@ void QtConfig::SaveLayoutValues() {
     WriteGlobalSetting(Settings::values.planar_shadow_mode);
     WriteGlobalSetting(Settings::values.planar_shadow_max_depth);
     WriteGlobalSetting(Settings::values.planar_shadow_flip);
+    WriteGlobalSetting(Settings::values.planar_shadow_replace_original);
     WriteGlobalSetting(Settings::values.reshade_config_path);
     WriteGlobalSetting(Settings::values.anaglyph_shader_name);
     WriteGlobalSetting(Settings::values.layout_option);

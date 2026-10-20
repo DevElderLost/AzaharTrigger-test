@@ -307,6 +307,30 @@
         <item>2</item>
     </integer-array>
 
+    <string-array name="planarShadowModeNames">
+        <item>@string/planar_shadow_mode_skinned</item>
+        <item>@string/planar_shadow_mode_all</item>
+    </string-array>
+
+    <integer-array name="planarShadowModeValues">
+        <item>0</item>
+        <item>1</item>
+    </integer-array>
+
+    <string-array name="planarShadowFlipNames">
+        <item>@string/planar_shadow_flip_none</item>
+        <item>@string/planar_shadow_flip_vertical</item>
+        <item>@string/planar_shadow_flip_horizontal</item>
+        <item>@string/planar_shadow_flip_both</item>
+    </string-array>
+
+    <integer-array name="planarShadowFlipValues">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </integer-array>
+
     <string-array name="textureFilterNames">
         <item>@string/none</item>
         <item>@string/anime4k</item>

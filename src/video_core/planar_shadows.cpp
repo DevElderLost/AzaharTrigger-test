@@ -45,6 +45,12 @@ PlanarShadowOptions PlanarShadowOptions::FromSettings() {
     return o;
 }
 
+bool PlanarShadowReplacesOriginal() {
+    return Settings::values.planar_shadows.GetValue() &&
+           Settings::values.planar_shadow_replace_original.GetValue() &&
+           Settings::values.graphics_api.GetValue() == Settings::GraphicsAPI::Vulkan;
+}
+
 PlanarShadowUniforms BuildPlanarShadowUniforms(const PlanarShadowOptions& o, float aspect) {
     PlanarShadowUniforms u;
 

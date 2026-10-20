@@ -13,6 +13,7 @@ import android.view.ViewGroup.MarginLayoutParams
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -21,6 +22,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.preference.PreferenceManager
 import com.google.android.material.color.MaterialColors
+import java.io.File
 import java.io.IOException
 import org.citra.citra_emu.CitraApplication
 import org.citra.citra_emu.NativeLibrary
@@ -35,6 +37,7 @@ import org.citra.citra_emu.features.settings.model.SettingsViewModel
 import org.citra.citra_emu.features.settings.model.StringSetting
 import org.citra.citra_emu.features.settings.utils.SettingsFile
 import org.citra.citra_emu.utils.DirectoryInitialization
+import org.citra.citra_emu.utils.FileUtil
 import org.citra.citra_emu.utils.InsetsHelper
 import org.citra.citra_emu.utils.RefreshRateUtil
 import org.citra.citra_emu.utils.SystemSaveGame
@@ -50,6 +53,61 @@ class SettingsActivity :
     private val settingsViewModel: SettingsViewModel by viewModels()
 
     override val settings: Settings get() = settingsViewModel.settings
+
+    private val reshadeImporter = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> importReShadeShaders(uris) }
+
+    /** Lets the user pick .fx/.fxh files, a ReShade preset or a vkBasalt.conf to import. */
+    fun launchReShadeImport() {
+        reshadeImporter.launch(arrayOf("*/*"))
+    }
+
+    private fun displayName(uri: Uri): String {
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { if (it.moveToFirst()) return it.getString(0) }
+        return uri.lastPathSegment?.substringAfterLast('/') ?: "shader.fx"
+    }
+
+    private fun importReShadeShaders(uris: List<Uri>) {
+        if (uris.isEmpty()) {
+            return
+        }
+        val staging = File(cacheDir, "reshade_import")
+        staging.deleteRecursively()
+        staging.mkdirs()
+        for (uri in uris) {
+            FileUtil.copyUriToInternalStorage(uri, staging.path, displayName(uri))
+        }
+        // Headers first so that effects can resolve their includes, presets and configs last
+        val order = compareBy<File> {
+            when (it.extension.lowercase()) {
+                "fxh" -> 0
+                "fx" -> 1
+                "ini", "conf" -> 3
+                else -> 2
+            }
+        }
+        var config = ""
+        var copied = 0
+        for (file in (staging.listFiles() ?: emptyArray()).sortedWith(order)) {
+            val result = NativeLibrary.importReShadeShaders(file.path)
+            if (result.isNotEmpty()) {
+                config = result
+                copied++
+            }
+        }
+        staging.deleteRecursively()
+        if (config.isEmpty()) {
+            Toast.makeText(this, R.string.reshade_import_failed, Toast.LENGTH_LONG).show()
+            return
+        }
+        StringSetting.RESHADE_CONFIG_PATH.string = config
+        settingsFragment?.putSetting(StringSetting.RESHADE_CONFIG_PATH)
+        onSettingChanged()
+        settingsFragment?.loadSettingsList()
+        Toast.makeText(this, getString(R.string.reshade_import_done, copied), Toast.LENGTH_LONG).show()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         RefreshRateUtil.enforceRefreshRate(this)

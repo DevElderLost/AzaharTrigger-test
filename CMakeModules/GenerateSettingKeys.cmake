@@ -108,6 +108,7 @@ foreach(KEY IN ITEMS
     "planar_shadow_mode"
     "planar_shadow_max_depth"
     "planar_shadow_flip"
+    "planar_shadow_replace_original"
     "reshade_enabled"
     "reshade_config_path"
     "dump_textures"

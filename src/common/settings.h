@@ -643,6 +643,10 @@ struct Values {
     // Bit 0 mirrors the screen vertical axis, bit 1 the horizontal one. Use when shadows are
     // projected towards the sky or mirrored left/right for a game.
     SwitchableSetting<s32, true> planar_shadow_flip{0, 0, 3, Keys::planar_shadow_flip};
+    // Drop the game's own shadows (PICA shadow map rendering and shadow lookups) while planar
+    // shadows are on, so only the planar shadow of the full character mesh remains
+    SwitchableSetting<bool> planar_shadow_replace_original{true,
+                                                           Keys::planar_shadow_replace_original};
     // View depth beyond which no shadow is drawn, 0 disables the limit
     SwitchableSetting<s32, true> planar_shadow_max_depth{0, 0, 10000,
                                                          Keys::planar_shadow_max_depth};

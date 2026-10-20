@@ -256,6 +256,7 @@ void RestoreGlobalState(bool is_powered_on) {
     values.planar_shadow_mode.SetGlobal(true);
     values.planar_shadow_max_depth.SetGlobal(true);
     values.planar_shadow_flip.SetGlobal(true);
+    values.planar_shadow_replace_original.SetGlobal(true);
     values.reshade_enabled.SetGlobal(true);
     values.reshade_config_path.SetGlobal(true);
     values.dump_textures.SetGlobal(true);

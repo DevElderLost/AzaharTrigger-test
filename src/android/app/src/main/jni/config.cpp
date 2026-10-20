@@ -184,6 +184,7 @@ void Config::ReadValues() {
     ReadSetting("Renderer", Settings::values.planar_shadow_mode);
     ReadSetting("Renderer", Settings::values.planar_shadow_max_depth);
     ReadSetting("Renderer", Settings::values.planar_shadow_flip);
+    ReadSetting("Renderer", Settings::values.planar_shadow_replace_original);
     ReadSetting("Renderer", Settings::values.reshade_config_path);
     ReadSetting("Renderer", Settings::values.use_integer_scaling);
 

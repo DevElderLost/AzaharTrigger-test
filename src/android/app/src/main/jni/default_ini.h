@@ -227,6 +227,9 @@ static const char* android_config_default_file_content = (BOOST_HANA_STRING(R"(
 # 1: Every opaque draw that writes depth
 )") DECLARE_KEY(planar_shadow_mode) BOOST_HANA_STRING(R"(
 
+# Remove the game's own shadows while planar shadows are on. true (default), false
+)") DECLARE_KEY(planar_shadow_replace_original) BOOST_HANA_STRING(R"(
+
 # Mirror the shadow axes: bit 0 flips the screen vertical axis, bit 1 the horizontal axis.
 # 0 (default) - 3
 )") DECLARE_KEY(planar_shadow_flip) BOOST_HANA_STRING(R"(

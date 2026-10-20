@@ -542,6 +542,16 @@ void RasterizerVulkan::DrawTriangles() {
 
 bool RasterizerVulkan::Draw(bool accelerate, bool is_indexed) {
     MICROPROFILE_SCOPE(Vulkan_Drawing);
+
+    // The game renders a simplified caster (no armor) into the PICA shadow buffer. Planar shadows
+    // replace it, so these draws are dropped.
+    if (regs.framebuffer.IsShadowRendering() &&
+        VideoCore::PlanarShadowReplacesOriginal()) {
+        vertex_batch.clear();
+        shadow_draws_skipped++;
+        return true;
+    }
+
     SyncDrawState();
 
     const bool shadow_rendering = regs.framebuffer.IsShadowRendering();
@@ -724,6 +734,14 @@ void RasterizerVulkan::DrawPlanarShadow(bool is_indexed) {
     }
 
     AccelerateDrawBatchInternal(is_indexed);
+    shadow_casters_drawn++;
+    if (++shadow_log_counter == 1 || (shadow_log_counter % 2000) == 0) {
+        LOG_INFO(Render_Vulkan,
+                 "Planar shadows: {} caster draws, {} original shadow draws skipped "
+                 "(vertices={}, skinned detection={})",
+                 shadow_casters_drawn, shadow_draws_skipped, regs.pipeline.num_vertices,
+                 !shadow_options.all_opaque_draws);
+    }
 
     pipeline_info = saved_info;
     vs_data = saved_vs_data;

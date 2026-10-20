@@ -40,6 +40,10 @@ struct PlanarShadowOptions {
     static PlanarShadowOptions FromSettings();
 };
 
+/// True when the game's own PICA shadows (shadow map draws and shadow lookups in lighting) must
+/// be dropped because planar shadows replace them.
+bool PlanarShadowReplacesOriginal();
+
 /// Values uploaded to the vertex shader uniform block. Layout matches `shadow_*` in vs_data.
 struct PlanarShadowUniforms {
     // x: enabled (1.0 / 0.0), y: tan(fov/2) for the screen vertical axis (signed),
