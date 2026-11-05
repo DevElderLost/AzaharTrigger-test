@@ -19,6 +19,8 @@ constexpr u16 DefaultRoomPort = 24872;
 
 constexpr u32 MaxMessageSize = 500;
 
+constexpr u32 azaharplus_network_version = 1;
+
 /// Maximum number of concurrent connections allowed to this room.
 static constexpr u32 MaxConcurrentConnections = 254;
 
@@ -29,6 +31,7 @@ struct RoomInformation {
     std::string description;    ///< Server description
     u32 member_slots;           ///< Maximum number of members in this room
     u16 port;                   ///< The port of this room
+    std::string address;        ///< The address others should use to connect to this room
     std::string preferred_game; ///< Game to advertise that you want to play
     u64 preferred_game_id;      ///< Title ID for the advertised game
     std::string host_username;  ///< Forum username of the host
@@ -75,6 +78,14 @@ enum RoomMessageTypes : u8 {
     IdModPermissionDenied,
     IdModNoSuchUser,
     IdJoinSuccessAsMod,
+    // Specific to AzaharPlus
+    idAzaharPlusSpecific = 0xff
+};
+
+enum AzaharPlusSpecificTypes : u8 {
+    IdZipPassAnnounce = 1,
+    IdZipPassUpload,
+    IdZipPassDownload,
 };
 
 /// Types of system status messages

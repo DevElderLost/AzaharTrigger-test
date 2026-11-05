@@ -141,6 +141,9 @@ bool AndroidMultiplayer::NetworkInit() {
             msg += chat.message;
             AddNetPlayMessage(static_cast<int>(status), msg);
         });
+        member->BindOnRoomInformationChanged([this](const Network::RoomInformation&) {
+            AddNetPlayMessage(static_cast<int>(NetPlayStatus::ROOM_INFORMATION_UPDATED), "");
+        });
     }
 
     return true;
@@ -171,16 +174,25 @@ NetPlayStatus AndroidMultiplayer::NetPlayCreateRoom(const std::string& ipaddress
         return NetPlayStatus::CREATE_ROOM_ERROR;
     }
 
+    // Use the ipaddress passed from the Android frontend instead of ""
     if (!room->Create(room_name, "", ipaddress, port, password, std::min(max_players, 16),
                       NetSettings::values.citra_username, preferedGameName, preferedGameId,
                       std::make_unique<Network::VerifyUser::NullBackend>(), {})) {
         return NetPlayStatus::CREATE_ROOM_ERROR;
     }
 
+    // Get the actual IP address from the room information
+    std::string server_address = room->GetRoomInformation().address;
+
+    std::string join_address = server_address;
+    if (join_address.empty() || join_address == "0.0.0.0") {
+        join_address = "127.0.0.1";
+    }
+
     // Failsafe timer to avoid joining before creation
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    member->Join(username, Service::CFG::GetConsoleIdHash(system), ipaddress.c_str(), port, 0,
+    member->Join(username, Service::CFG::GetConsoleIdHash(system), join_address.c_str(), port, 0,
                  Network::NoPreferredMac, password);
 
     // Failsafe timer to avoid joining before creation
@@ -282,9 +294,11 @@ std::vector<std::string> AndroidMultiplayer::NetPlayRoomInfo() {
     if (auto room = Network::GetRoomMember().lock()) {
         auto members = room->GetMemberInformation();
         if (!members.empty()) {
-            // name and max players
+            // name, max players, address, and port
             auto room_info = room->GetRoomInformation();
-            info_list.push_back(room_info.name + "|" + std::to_string(room_info.member_slots));
+            const auto& address = room->GetServerAddress();
+            info_list.push_back(room_info.name + "|" + std::to_string(room_info.member_slots) +
+                                "|" + address + "|" + std::to_string(room_info.port));
             // all members
             for (const auto& member : members) {
                 info_list.push_back(member.nickname);
@@ -345,16 +359,32 @@ std::vector<std::string> AndroidMultiplayer::NetPlayGetPublicRooms() {
     if (auto session = announce_multiplayer_session.lock()) {
         auto rooms = session->GetRoomList();
         for (const auto& room : rooms) {
-            room_list.push_back(room.name + "|" + (room.has_password ? "1" : "0") + "|" +
+            std::string name = room.name;
+            std::string description = room.description;
+            std::string owner = room.owner;
+            std::string preferred_game = room.preferred_game;
+
+            std::replace(name.begin(), name.end(), '|', '-');
+            std::replace(description.begin(), description.end(), '|', '-');
+            std::replace(owner.begin(), owner.end(), '|', '-');
+            std::replace(preferred_game.begin(), preferred_game.end(), '|', '-');
+
+            room_list.push_back(name + "|" + (room.has_password ? "1" : "0") + "|" +
                                 std::to_string(room.max_player) + "|" + room.ip + "|" +
-                                std::to_string(room.port) + "|" + room.description + "|" +
-                                room.owner + "|" + std::to_string(room.preferred_game_id) + "|" +
-                                room.preferred_game);
+                                std::to_string(room.port) + "|" + description + "|" + owner + "|" +
+                                std::to_string(room.preferred_game_id) + "|" + preferred_game);
 
             for (const auto& member : room.members) {
-                room_list.push_back("MEMBER|" + room.name + "|" + member.username + "|" +
-                                    member.nickname + "|" + std::to_string(member.game_id) + "|" +
-                                    member.game_name);
+                std::string username = member.username;
+                std::string nickname = member.nickname;
+                std::string game_name = member.game_name;
+
+                std::replace(username.begin(), username.end(), '|', '-');
+                std::replace(nickname.begin(), nickname.end(), '|', '-');
+                std::replace(game_name.begin(), game_name.end(), '|', '-');
+
+                room_list.push_back("MEMBER|" + name + "|" + username + "|" + nickname + "|" +
+                                    std::to_string(member.game_id) + "|" + game_name);
             }
         }
     }

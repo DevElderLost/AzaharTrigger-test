@@ -16,6 +16,7 @@ import android.text.format.Formatter
 import android.widget.Toast
 import androidx.preference.PreferenceManager
 import org.citra.citra_emu.CitraApplication
+import org.citra.citra_emu.NativeLibrary
 import org.citra.citra_emu.R
 import org.citra.citra_emu.dialogs.ChatMessage
 import java.net.Inet4Address
@@ -149,8 +150,12 @@ object NetPlayManager {
         adapterRefreshListener = listener
     }
 
-    fun getUsername(activity: Context): String {        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
-        val name = "Azahar${(Math.random() * 100).toInt()}"
+    fun getUsername(activity: Context): String {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+        var name = NativeLibrary.getSystemUsername()
+        if (name.isEmpty()) {
+            name = "Azahar${(Math.random() * 100).toInt()}"
+        }
         return prefs.getString("NetPlayUsername", name) ?: name
     }
 
@@ -231,7 +236,7 @@ object NetPlayManager {
         }
 
             Handler(Looper.getMainLooper()).post {
-                if (!isChatOpen) {
+                if (!isChatOpen && message.isNotEmpty()) {
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
             }
@@ -264,6 +269,7 @@ object NetPlayManager {
             NetPlayStatus.ROOM_JOINING -> context.getString(R.string.multiplayer_room_joining)
             NetPlayStatus.ROOM_JOINED -> context.getString(R.string.multiplayer_room_joined)
             NetPlayStatus.ROOM_MODERATOR -> context.getString(R.string.multiplayer_room_moderator)
+            NetPlayStatus.ROOM_INFORMATION_UPDATED -> ""
             NetPlayStatus.MEMBER_JOIN -> context.getString(R.string.multiplayer_member_join, msg)
             NetPlayStatus.MEMBER_LEAVE -> context.getString(R.string.multiplayer_member_leave, msg)
             NetPlayStatus.MEMBER_KICKED -> context.getString(R.string.multiplayer_member_kicked, msg)
@@ -429,5 +435,6 @@ object NetPlayManager {
         const val MEMBER_BANNED = 25
         const val ADDRESS_UNBANNED = 26
         const val CHAT_MESSAGE = 27
+        const val ROOM_INFORMATION_UPDATED = 28
     }
 }

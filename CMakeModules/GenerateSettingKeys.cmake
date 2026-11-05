@@ -32,6 +32,7 @@ foreach(KEY IN ITEMS
     "physical_device"
     "use_gles"
     "renderer_debug"
+    "pica_debugging"
     "dump_command_buffers"
     "spirv_shader_gen"
     "disable_spirv_optimizer"
@@ -41,6 +42,7 @@ foreach(KEY IN ITEMS
     "use_disk_shader_cache"
     "shaders_accurate_mul"
     "use_vsync"
+    "use_skip_duplicate_frames"
     "use_display_refresh_rate_detection"
     "use_shader_jit"
     "resolution_factor"
@@ -198,6 +200,7 @@ if (ENABLE_QT)
         "geometry"
         "state"
         "geometryRenderWindow"
+        "geometrySecondaryWindow"
         "gameListHeaderState"
         "microProfileDialogGeometry"
         "name"
@@ -206,12 +209,15 @@ if (ENABLE_QT)
         "use_touchpad"
         "controller_touch_device"
         "use_touch_from_button"
+        "input_maptype"
+        "controller_hotkey_maptype"
         "touch_from_button_map"
         "touch_from_button_maps" # Why are these two so similar? Basically typo bait
         "nand_directory"
         "sdmc_directory"
         "game_id"
         "KeySeq"
+        "controller_keyseq"
         "gamedirs"
         "libvorbis"
         "Context"
@@ -238,6 +244,8 @@ if (ANDROID)
         "android_hide_images"
         "screen_orientation"
         "performance_overlay_position"
+        "enable_secondary_display"
+        "combo_button_buttons"
     )
         string(REPLACE "_" "_1" KEY_JNI_ESCAPED ${KEY})
         set(SETTING_KEY_LIST "${SETTING_KEY_LIST}\n\"${KEY}\",")

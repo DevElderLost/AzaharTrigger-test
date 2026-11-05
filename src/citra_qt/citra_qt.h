@@ -25,6 +25,11 @@
 #include "citra_qt/hotkeys.h"
 #include "citra_qt/notification_led.h"
 #include "citra_qt/user_data_migration.h"
+#include "citra_qt/virtual_touch_pointer.h"
+#ifdef ENABLE_QT_UPDATE_CHECKER
+#include "citra_qt/update_checker.h"
+#include "citra_qt/updater/self_updater.h"
+#endif
 #include "core/core.h"
 #include "core/savestate.h"
 #include "video_core/rasterizer_interface.h"
@@ -153,6 +158,7 @@ signals:
     void InfoLEDColorChanged();
     // Signal that tells widgets to update icons to use the current theme
     void UpdateThemedIcons();
+    void InstalledTitlesChanged();
 
 private:
     void InitializeWidgets();
@@ -278,6 +284,8 @@ private slots:
     void OnLoadAmiibo();
     void OnRemoveAmiibo();
     void OnOpenCitraFolder();
+    void OnOpenNANDFolder();
+    void OnOpenSDMCFolder();
     void OnToggleFilterBar();
     void OnDisplayTitleBars(bool);
     void InitializeHotkeys();
@@ -325,6 +333,8 @@ private slots:
     void OnMute();
 #ifdef ENABLE_QT_UPDATE_CHECKER
     void OnEmulatorUpdateAvailable();
+    /// Called whenever a user selects Help->Check for Updates
+    void OnMenuCheckForUpdates();
 #endif
     void OnSwitchDiskResources(VideoCore::LoadCallbackStage stage, std::size_t value,
                                std::size_t total, const std::string& object);
@@ -348,6 +358,9 @@ private:
     void UpdateVolumeUI();
     void UpdateAPIIndicator(bool update = false);
     void UpdateStatusButtons();
+#ifdef ENABLE_QT_UPDATE_CHECKER
+    void PromptAndApplyUpdate(const UpdateChecker::ReleaseInfo& release);
+#endif
 #ifdef __unix__
     void SetGamemodeEnabled(bool state);
 #endif
@@ -357,6 +370,7 @@ private:
     Core::Movie& movie;
 
     GRenderWindow* render_window;
+    std::unique_ptr<VirtualTouchPointer> virtual_touch_pointer;
     GRenderWindow* secondary_window;
 
     GameListPlaceholder* game_list_placeholder;
@@ -420,23 +434,25 @@ private:
     // Whether game was paused due to stopping video dumping
     bool game_paused_for_dumping = false;
 
+    int gdbport_from_arg = -1;
+
     QString gl_renderer;
     std::vector<QString> physical_devices;
 
     // Debugger panes
-    ProfilerWidget* profilerWidget;
+    ProfilerWidget* profilerWidget{};
 #if MICROPROFILE_ENABLED
-    MicroProfileDialog* microProfileDialog;
+    MicroProfileDialog* microProfileDialog{};
 #endif
-    RegistersWidget* registersWidget;
-    GPUCommandStreamWidget* graphicsWidget;
-    GPUCommandListWidget* graphicsCommandsWidget;
-    GraphicsBreakPointsWidget* graphicsBreakpointsWidget;
-    GraphicsVertexShaderWidget* graphicsVertexShaderWidget;
-    GraphicsTracingWidget* graphicsTracingWidget;
-    IPCRecorderWidget* ipcRecorderWidget;
-    LLEServiceModulesWidget* lleServiceModulesWidget;
-    WaitTreeWidget* waitTreeWidget;
+    RegistersWidget* registersWidget{};
+    GPUCommandStreamWidget* graphicsWidget{};
+    GPUCommandListWidget* graphicsCommandsWidget{};
+    GraphicsBreakPointsWidget* graphicsBreakpointsWidget{};
+    GraphicsVertexShaderWidget* graphicsVertexShaderWidget{};
+    GraphicsTracingWidget* graphicsTracingWidget{};
+    IPCRecorderWidget* ipcRecorderWidget{};
+    LLEServiceModulesWidget* lleServiceModulesWidget{};
+    WaitTreeWidget* waitTreeWidget{};
 
     QAction* actions_recent_files[max_recent_files_item];
     std::array<QAction*, Core::SaveStateSlotCount> actions_load_state;
@@ -453,7 +469,8 @@ private:
     QAction* action_secondary_swap_screen;
     QAction* action_secondary_rotate_screen;
 
-    QTranslator translator;
+    QTranslator qtTranslator;
+    QTranslator citraTranslator;
 
     // stores default icon theme search paths for the platform
     QStringList default_theme_paths;
@@ -464,8 +481,9 @@ private:
 
 #ifdef ENABLE_QT_UPDATE_CHECKER
     // Prompt shown when update check succeeds
-    QFuture<QString> update_future;
-    QFutureWatcher<QString> update_watcher;
+    QFuture<std::optional<UpdateChecker::ReleaseInfo>> update_future;
+    QFutureWatcher<std::optional<UpdateChecker::ReleaseInfo>> update_watcher;
+    Updater::SelfUpdater* self_updater = nullptr;
 #endif
 
 #ifdef __unix__

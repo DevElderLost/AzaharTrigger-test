@@ -12,10 +12,10 @@ import android.content.Context
 import android.os.Build
 import org.citra.citra_emu.utils.DirectoryInitialization
 import org.citra.citra_emu.utils.DocumentsTree
-import org.citra.citra_emu.utils.GpuDriverHelper
-import org.citra.citra_emu.utils.PermissionsHandler
+import org.citra.citra_emu.utils.GraphicsUtil
 import org.citra.citra_emu.utils.Log
 import org.citra.citra_emu.utils.MemoryUtil
+import org.citra.citra_emu.utils.PermissionsHandler
 
 class CitraApplication : Application() {
     private fun createNotificationChannel() {
@@ -44,6 +44,18 @@ class CitraApplication : Application() {
             ciaChannel.setSound(null, null)
             ciaChannel.vibrationPattern = null
             createNotificationChannel(ciaChannel)
+
+            // App update download notifications
+            val updateChannel = NotificationChannel(
+                getString(R.string.app_update_notification_channel_id),
+                getString(R.string.app_update_notification_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            updateChannel.description =
+                getString(R.string.app_update_notification_channel_description)
+            updateChannel.setSound(null, null)
+            updateChannel.vibrationPattern = null
+            createNotificationChannel(updateChannel)
         }
     }
 
@@ -69,6 +81,7 @@ class CitraApplication : Application() {
             Log.info("SoC Model - ${Build.SOC_MODEL}")
         }
         Log.info("Total System Memory - ${MemoryUtil.getDeviceRAM()}")
+        Log.info("OpenGL ES Renderer - ${GraphicsUtil.openGLRendererString}")
     }
 
     companion object {

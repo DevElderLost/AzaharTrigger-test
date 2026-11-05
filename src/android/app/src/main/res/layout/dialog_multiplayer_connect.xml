@@ -132,7 +132,7 @@
                             app:cornerRadius="16dp" />
                     </LinearLayout>
 
-                </LinearLayout>
+        </LinearLayout>
 
                 <!-- melonDS LAN Content -->
                 <LinearLayout

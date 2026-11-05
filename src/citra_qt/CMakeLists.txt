@@ -63,6 +63,9 @@ add_library(citra_qt STATIC EXCLUDE_FROM_ALL
     configuration/configure_hotkeys.cpp
     configuration/configure_hotkeys.h
     configuration/configure_hotkeys.ui
+    configuration/configure_hotkeys_controller.cpp
+    configuration/configure_hotkeys_controller.h
+    configuration/configure_hotkeys_controller.ui
     configuration/configure_input.cpp
     configuration/configure_input.h
     configuration/configure_input.ui
@@ -140,6 +143,8 @@ add_library(citra_qt STATIC EXCLUDE_FROM_ALL
     game_list_worker.h
     hotkeys.cpp
     hotkeys.h
+    hotkey_monitor.cpp
+    hotkey_monitor.h
     loading_screen.cpp
     loading_screen.h
     loading_screen.ui
@@ -196,10 +201,14 @@ add_library(citra_qt STATIC EXCLUDE_FROM_ALL
     util/graphics_device_info.h
     util/sequence_dialog/sequence_dialog.cpp
     util/sequence_dialog/sequence_dialog.h
+    util/sequence_dialog/controller_sequence_dialog.cpp
+    util/sequence_dialog/controller_sequence_dialog.h
     util/spinbox.cpp
     util/spinbox.h
     util/util.cpp
     util/util.h
+    virtual_touch_pointer.cpp
+    virtual_touch_pointer.h
 )
 
 target_include_directories(citra_qt PUBLIC ${CMAKE_BINARY_DIR}/src)
@@ -219,12 +228,26 @@ file(GLOB_RECURSE THEMES ${PROJECT_SOURCE_DIR}/dist/qt_themes/*)
 
 if (ENABLE_QT_UPDATE_CHECKER)
     target_link_libraries(citra_qt PRIVATE httplib json-headers)
-    target_sources(citra_qt PRIVATE update_checker.cpp)
-    target_compile_definitions(citra_qt PUBLIC ENABLE_QT_UPDATE_CHECKER)
+    target_sources(citra_qt PRIVATE
+        update_checker.cpp
+        update_checker.h
+        updater/self_updater.cpp
+        updater/self_updater.h
+    )
+    target_compile_definitions(citra_qt PUBLIC
+        ENABLE_QT_UPDATE_CHECKER
+        AZAHAR_UPDATE_REPO_OWNER="${AZAHAR_UPDATE_REPO_OWNER}"
+        AZAHAR_UPDATE_REPO_NAME="${AZAHAR_UPDATE_REPO_NAME}"
+    )
 endif()
 
 if (ENABLE_QT_TRANSLATION)
-    set(CITRA_QT_LANGUAGES "${PROJECT_SOURCE_DIR}/dist/languages" CACHE PATH "Path to the translation bundle for the Qt frontend")
+    if (EXISTS "${QT_TARGET_PATH}/translations")
+        set(BASE_QT_LANGUAGES "${QT_TARGET_PATH}/translations" CACHE PATH "Path to Qt base translations")
+    else()
+        set(BASE_QT_LANGUAGES "${QT_TARGET_PATH}/share/qt6/translations" CACHE PATH "Path to Qt base translations")
+    endif()
+    set(CITRA_QT_LANGUAGES "${PROJECT_SOURCE_DIR}/dist/languages" CACHE PATH "Path to Citra translations")
     option(GENERATE_QT_TRANSLATION "Generate en.ts as the translation source file" OFF)
 
     # Update source TS file if enabled
@@ -241,17 +264,23 @@ if (ENABLE_QT_TRANSLATION)
         add_custom_target(translation ALL DEPENDS citra_qt_lupdate)
     endif()
 
-    # Find all TS files except en.ts
-    file(GLOB_RECURSE LANGUAGES_TS ${CITRA_QT_LANGUAGES}/*.ts)
-    list(REMOVE_ITEM LANGUAGES_TS ${CITRA_QT_LANGUAGES}/en.ts)
+    # Find all TS files for Citra translations except en.ts
+    file(GLOB_RECURSE CITRA_LANGUAGES_TS ${CITRA_QT_LANGUAGES}/*.ts)
+    list(REMOVE_ITEM CITRA_LANGUAGES_TS ${CITRA_QT_LANGUAGES}/en.ts)
 
-    # Compile TS files to QM files
-    qt_add_lrelease(citra_qt TS_FILES ${LANGUAGES_TS} NO_GLOBAL_TARGET QM_FILES_OUTPUT_VARIABLE LANGUAGES_QM)
+    # Compile Citra TS files to QM files
+    qt_add_lrelease(citra_qt TS_FILES ${CITRA_LANGUAGES_TS} NO_GLOBAL_TARGET QM_FILES_OUTPUT_VARIABLE CITRA_LANGUAGES_QM)
+
+    # Find all QM files for Qt translations
+    file(GLOB_RECURSE QT_LANGUAGES_QM ${BASE_QT_LANGUAGES}/qtbase_*.qm)
+
+    # Copy base QT QM files into build directory
+    file(COPY ${QT_LANGUAGES_QM} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
     # Build a QRC file from the QM file list
     set(LANGUAGES_QRC ${CMAKE_CURRENT_BINARY_DIR}/languages.qrc)
     file(WRITE ${LANGUAGES_QRC} "<RCC><qresource prefix=\"languages\">\n")
-    foreach (QM ${LANGUAGES_QM})
+    foreach (QM ${QT_LANGUAGES_QM} ${CITRA_LANGUAGES_QM})
         get_filename_component(QM_FILE ${QM} NAME)
         file(APPEND ${LANGUAGES_QRC} "<file>${QM_FILE}</file>\n")
     endforeach (QM)
