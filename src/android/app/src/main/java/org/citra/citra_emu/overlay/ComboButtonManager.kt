@@ -94,7 +94,7 @@ object ComboButtonManager {
         val slot = slotForId(buttonId)
         if (slot < 0) return
         for (nativeBtn in getButtonsForSlot(slot)) {
-            NativeLibrary.onGamePadEvent(NativeLibrary.TouchScreenDevice, nativeBtn, state)
+            NativeLibrary.onGamePadEvent(NativeLibrary.TOUCHSCREEN_DEVICE, nativeBtn, state)
         }
     }
 

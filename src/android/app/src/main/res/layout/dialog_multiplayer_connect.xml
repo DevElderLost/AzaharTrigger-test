@@ -104,6 +104,32 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
+                        android:layout_marginBottom="8dp"
+                        android:layout_marginHorizontal="16dp">
+
+                        <Space
+                            android:layout_width="40dp"
+                            android:layout_height="match_parent" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnWifiDirect"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/multiplayer_wifi_direct"
+                            app:cornerRadius="16dp"
+                            app:icon="@drawable/ic_network" />
+
+                        <Space
+                            android:layout_width="40dp"
+                            android:layout_height="match_parent" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
                         android:layout_marginHorizontal="16dp"
                         android:layout_marginBottom="8dp">
 

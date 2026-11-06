@@ -36,8 +36,6 @@ import org.citra.citra_emu.utils.ComboHelper
 import org.citra.citra_emu.utils.EmulationMenuSettings
 import org.citra.citra_emu.utils.TurboHelper
 import org.citra.citra_emu.overlay.ComboButtonManager
-import java.lang.NullPointerException
-import kotlin.math.min
 
 /**
  * Draws the interactive input overlay on top of the
@@ -226,7 +224,7 @@ class InputOverlay(context: Context?, attrs: AttributeSet?) :
                         ComboButtonManager.dispatchComboEvent(button.id, button.status)
                     } else {
                         NativeLibrary.onGamePadEvent(
-                            NativeLibrary.TouchScreenDevice,
+                            NativeLibrary.TOUCHSCREEN_DEVICE,
                             button.id,
                             button.status
                         )

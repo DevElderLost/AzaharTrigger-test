@@ -622,13 +622,6 @@ class NetPlayDialog(context: Context) : BottomSheetDialog(context) {
                 if (id == -1L) 0L else id  // convert "None" sentinel to 0 (no preference)
             }
             val password = binding.password.text.toString()
-            // FIX BUG #2: Hanya ambil preferedGameId saat isCreateRoom,
-            // hindari indexOfFirst() mengembalikan -1 saat Join Room
-            val preferedGameName = if (isCreateRoom) binding.dropdownPreferedGameName.text.toString() else ""
-            val preferedGameId: Long = if (isCreateRoom) {
-                val idx = gameNameList.indexOfFirst { it[0] == preferedGameName }
-                if (idx >= 0) gameIdList[idx][0] else 0L
-            } else 0L
 
             val port = portStr.toIntOrNull() ?: run {
                 Toast.makeText(activity, R.string.multiplayer_port_invalid, Toast.LENGTH_LONG)
