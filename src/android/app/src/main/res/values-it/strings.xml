@@ -26,7 +26,7 @@
     <string name="select_games_folder">Seleziona cartella applicazioni</string>
     <string name="select_games_folder_description">Permette ad Azahar di popolare la lista di applicazioni</string>
     <string name="about">Informazioni</string>
-    <string name="citra_description">Un emulatore 3DS open-source</string>
+    <string name="citra_description">Un emulatore 3DS open-source\nRilasciato sotto licenza GPLv3 o qualsiasi versione successiva</string>
     <string name="about_description">Versione build, riconoscimenti e altro</string>
     <string name="games_dir_selected">Cartella applicazioni selezionata</string>
     <string name="select_citra_user_folder_home_description">Cambia i file che Azahar usa per caricare le applicazioni</string>
@@ -153,7 +153,6 @@
     <string name="button_combo">Combo Button</string>
     <string name="input_message_analog_only">Questo comando dev\'essere assegnato alla levetta analogica di un gamepad o a un asse dei tasti direzionali!</string>
     <string name="input_message_button_only">Questo comando dev\'essere assegnato a un pulsante del gamepad!</string>
-    <string name="turbo_limit_hotkey">Velocità Turbo</string>
     <string name="turbo_enabled_toast">Velocità Turbo abilitata</string>
     <string name="turbo_disabled_toast">Velocità Turbo disabilitata</string>
     <string name="combo_button_settings">Configura Combo Button</string>
@@ -291,13 +290,21 @@
     <string name="internal_resolution_setting_8x">8x Nativa (3200x1920)</string>
     <string name="internal_resolution_setting_9x">9x Nativa (3600x2160)</string>
     <string name="internal_resolution_setting_10x">10x Nativa (4000x2400)</string>
+    <string name="internal_resolution_setting_11x">11x Nativa (4400x2640)</string>
+    <string name="internal_resolution_setting_12x">12x Nativa (4800x2880)</string>
+    <string name="internal_resolution_setting_13x">13x Nativa (5200x3120)</string>
+    <string name="internal_resolution_setting_14x">14x Nativa (5600x3360)</string>
+    <string name="internal_resolution_setting_15x">15x Nativa (6000x3600)</string>
+    <string name="internal_resolution_setting_16x">16x Nativa (6400x3840)</string>
+    <string name="internal_resolution_setting_17x">17x Nativa (6800x4080)</string>
+    <string name="internal_resolution_setting_18x">18x Nativa (7200x4320)</string>
     <string name="performance_warning">Disabilitare questa impostazione riducerà significativamente le prestazioni dell\'emulazione! Per un\'esperienza migliore, è consigliato lasciare questa impostazione abilitata.</string>
     <string name="debug_warning">Attenzione: Modificare queste impostazioni rallenterà l\'emulazione</string>
     <string name="stereoscopy">Stereoscopia</string>
     <string name="render3d">Modalità 3D stereoscopico</string>
     <string name="render3d_description">Scegli la modalità 3D stereoscopica per il rendering 3D. Le modalità \"Affiancato\" sono le più comuni nell\'uso moderno. Le modalità \"Anaglifo\" e \"Interlacciato\" si applicheranno sempre a tutti i display collegati.</string>
     <string name="factor3d">Profondità</string>
-    <string name="factor3d_description" formatted="false">Specifica il valore del regolatore di profondità 3D. Questo valore deve essere impostato su un valore superiore allo 0% quando è abilitato il 3D stereoscopico.\nNota: Valori di profondità superiori al 100% non sono possibili su un dispositivo reale e possono causare problemi grafici</string>
+    <string name="factor3d_description">Specifica il valore del regolatore di profondità 3D. Questo valore deve essere impostato su un valore superiore allo 0% quando è abilitato il 3D stereoscopico.\nNota: Valori di profondità superiori al 100% non sono possibili su un dispositivo reale e possono causare problemi grafici</string>
     <string name="disable_right_eye_render">Disattiva rendering occhio destro</string>
     <string name="disable_right_eye_render_description">Migliora notevolmente le prestazioni in alcune applicazioni, ma può causare flickering in altre.</string>
     <string name="swap_eyes_3d">Inverti occhi</string>
@@ -341,6 +348,8 @@
     <!-- Debug settings strings -->
     <string name="cpu_jit">CPU JIT</string>
     <string name="cpu_jit_description">Utilizza il compilatore Just-in-Time (JIT) per l\'emulazione della CPU. Se abilitato, le prestazioni di gioco miglioreranno significativamente.</string>
+    <string name="use_fastinterp">Usa interprete veloce</string>
+    <string name="use_fastinterp_description">Quando il JIT è disabilitato, usa l\'interprete veloce al posto dell\'interprete legacy.</string>
     <string name="hw_shaders">Abilita shader hardware</string>
     <string name="hw_shaders_description">Utilizza l\'hardware per emulare gli shader del 3DS. Se abilitato, le prestazioni dei giochi miglioreranno significativamente.</string>
     <string name="cpu_clock_speed">Velocità di clock della CPU</string>
@@ -396,8 +405,6 @@
     <string name="off">Spento</string>
     <string name="install">Installa</string>
     <string name="delete">Cancella</string>
-    <string name="reset_all_settings">Reimpostare tutte le impostazioni?</string>
-    <string name="reset_all_settings_description">Tutte le impostazioni avanzate verranno ripristinate ai valori predefiniti. L\'operazione non è annullabile.</string>
     <string name="settings_reset">Reimpostazione impostazioni</string>
     <string name="select_rtc_date">Seleziona data RTC</string>
     <string name="select_rtc_time">Seleziona orario RTC</string>
@@ -432,11 +439,10 @@
     <string name="preferences_debug">Debug</string>
     <string name="preferences_theme">Tema e colori</string>
     <string name="preferences_layout">Layout</string>
-
     <!-- ROM loading errors -->
     <string name="loader_error_generic_title">Errore nel caricamento dell\'applicazione</string>
     <string name="loader_error_invalid_format">Formato applicazione non valido</string>
-    <string name="loader_error_invalid_format_description"><![CDATA[Formato del file dell\'applicazione non supportato.<br>Assicurati di utilizzare uno dei formati compatibili:<ul><li>Immagini schedine: <b>.cci/.zcci/.3ds</b></li><li>Archivi installabili: <b>.cia/.zcia</b></li><li>Titoli Homebrew: <b>.3dsx/.z3dsx</b></li><li>Container NCCH: <b>.cxi/.zcxi/.app</b></li><li>File ELF: <b>.elf/.axf</b></li></ul>]]></string>
+    <string name="loader_error_invalid_format_description"><![CDATA[Formato del file dell\'applicazione non supportato.<br>Assicurati di utilizzare uno dei formati compatibili:<ul><li>Immagini schedine: <b>.cci/.zcci/.bcci/.3ds</b></li><li>Archivi installabili: <b>.cia/.zcia/.bcia</b></li><li>Titoli Homebrew: <b>.3dsx/.z3dsx</b></li><li>Container NCCH: <b>.cxi/.zcxi/.bcxi/.app</b></li><li>File ELF: <b>.elf/.axf</b></li></ul>]]></string>
     <string name="loader_error_invalid_system_mode">Modalità di sistema non valida</string>
     <string name="loader_error_invalid_system_mode_description">Le applicazioni esclusive per New 3DS non possono essere caricate senza aver abilitato la modalità New 3DS.</string>
     <string name="loader_error_applying_patches">Errore nell\'applicazione della patch</string>
@@ -446,8 +452,8 @@
     <string name="loader_error_encrypted_description"><![CDATA[Azahar non supporta le applicazioni criptate. Leggi il <a href=\"https://azahar-emu.org/blog/game-loading-changes/\">post sul nostro blog</a> per ulteriori informazioni.]]></string>
     <string name="loader_error_file_not_found">Il file ROM non esiste</string>
     <string name="no_game_present">Nessun gioco avviabile è presente!</string>
-
-    <string name="loader_error_generic">Si è verificato un errore durante il caricamento della ROM: \"%1$s (%2$d)\"</string>
+    <string name="invalid_rom">ROM non valida</string>
+    <string name="loader_error_generic">Si è verificato un errore durante il caricamento della ROM: \"%s (%d)\"</string>
     <string name="core_error_success">Successo</string>
     <string name="core_error_not_initialized">Non inizializzato</string>
     <string name="core_error_get_loader">Loader per il file non trovato, tipo di file non compatibile</string>
@@ -463,10 +469,9 @@
     <string name="core_error_artic_disconnected">Artic Base disconnesso</string>
     <string name="core_error_n3ds_application">Il file è un\'applicazione New 3DS</string>
     <string name="core_error_core_exception_raised">Rilevata eccezione del core</string>
-    <string name="core_error_memory_exception_raised">Rilevata eccezione della memoria</string>
+    <string name="core_error_savestate_build_mismatch">Versione savestate incompatibile</string>
     <string name="core_error_shutdown_requested">Spegnimento richiesto</string>
     <string name="core_error_unknown">Errore sconosciuto</string>
-
     <!-- Emulation Menu -->
     <string name="emulation_menu_help">Premi Indietro per accedere al menù</string>
     <string name="emulation_save_state">Salva stato</string>
@@ -614,6 +619,8 @@
     <string name="unsupported_encrypted">Applicazione criptata non supportata</string>
     <string name="invalid_system_mode">Modalità di sistema non valida</string>
     <string name="invalid_system_mode_message">Le applicazioni esclusive del New 3DS non possono essere caricate senza abilitare la modalità New 3DS.</string>
+    <string name="shader_cache_crash_message"><![CDATA[Azahar si è chiuso inaspettatamente durante l\'ultima creazione della cache degli shader per questo titolo. Il driver grafico potrebbe essere andato in crash su uno degli shader in cache e continuando potrebbe verificarsi un altro crash.<br/><br/>Per ripristinare la cache degli shader, tieni premuto sull\'applicazione nell\'elenco applicazioni, tocca <b>Elimina cache shader</b> e seleziona <b>Vulkan</b>.]]></string>
+    <string name="savestate_build_mismatch_message"><![CDATA[Impossibile caricare il savestate perché è stato creato su una versione diversa di Azahar:<br/><b>Azahar %1$s</b>.<br/><br/>Leggi il nostro articolo sul blog per <a href=\"https://azahar-emu.org/blog/understanding-save-states/\">saperne di più sui savestate</a>.<br/><br/>Per recuperare i tuoi progressi, torna alla versione <b>Azahar %1$s</b>, carica questo savestate e usa la funzione di salvataggio integrata nell\'applicazione.]]></string>
 
     <!-- Disk Shader Cache -->
     <string name="preparing_shaders">Preparazione degli shader</string>
@@ -642,9 +649,11 @@
     <string name="create_shortcut">Crea scorciatoia</string>
     <string name="shortcut_name_empty">Il nome della scorciatoia non può essere vuoto</string>
     <string name="shortcut_image_stretch_toggle">Estendi per adattare l\'immagine</string>
+    <string name="game_context_region">Regione:</string>
     <string name="game_context_id">ID:</string>
     <string name="game_context_file">File:</string>
     <string name="game_context_type">Tipo:</string>
+    <string name="game_context_playtime">Tempo di gioco:</string>
     <string name="game_context_insert">Inserisci schedina</string>
     <string name="game_context_eject">Rimuovi schedina</string>
 
@@ -706,8 +715,6 @@
     <string name="cia_install_error_encrypted">\"%s\" deve essere decriptato prima di essere usato in Azahar.\n Un 3DS reale è richiesto</string>
     <string name="cia_install_error_unknown">Errore sconosciuto durante l\'installazione di \"%s\".\n Consulta i log per maggiori dettagli</string>
 
-    <!-- Memory Sizes -->
-    <string name="memory_formatted">%1$s%2$s</string>
     <string name="memory_byte">Byte</string>
     <string name="memory_byte_shorthand">B</string>
     <string name="memory_kilobyte">KB</string>
@@ -734,15 +741,6 @@
     <!-- Black backgrounds theme -->
     <string name="use_black_backgrounds">Sfondi neri</string>
     <string name="use_black_backgrounds_description">Quando il tema scuro è attivo, usa sfondi neri.</string>
-
-    <!-- Region names -->
-    <string name="system_region_jpn">JPN</string>
-    <string name="system_region_usa">USA</string>
-    <string name="system_region_eur">EUR</string>
-    <string name="system_region_aus">AUS</string>
-    <string name="system_region_chn">CHN</string>
-    <string name="system_region_kor">KOR</string>
-    <string name="system_region_twn">TWN</string>
 
     <!-- Language names -->
     <string name="language_japanese">Giapponese (日本語)</string>
@@ -784,17 +782,9 @@
     <string name="interlaced">Interlacciato</string>
     <string name="reverse_interlaced">Interlacciato invertito</string>
 
-    <!-- Graphics API names -->
-    <string name="opengles">OpenGLES</string>
-    <string name="vulkan">Vulkan</string>
-
-    <!-- Texture filter names -->
-    <string name="anime4k">Anime4K</string>
-    <string name="bicubic">Bicubic</string>
-    <string name="scaleforce">ScaleForce</string>
-    <string name="xbrz">xBRZ</string>
-    <string name="mmpx">MMPX</string>
-
+    <!-- Texture filters -->
+    <string name="anime4k">Anime4K (solo OpenGL)</string>
+    <string name="incompatible_texture_filter">Filtro texture non compatibile</string>
     <!-- Texture Sampling names -->
     <string name="game_controlled">Controllata dal gioco</string>
     <string name="nearest_neighbor">Nearest Neighbor</string>
@@ -940,6 +930,14 @@
     <string name="vatican_city">Città del Vaticano</string>
     <string name="bermuda">Bermuda</string>
 
+    <!-- Regions (Japan, Australia, China and Taiwan are above) -->
+    <string name="north_america">Nord America</string>
+    <string name="europe">Europa</string>
+    <string name="korea">Corea</string>
+    <string name="region_free">Regione libera</string>
+    <string name="invalid_region">Regione non valida</string>
+    <string name="region_get_error">ERRORE PER FAVORE SEGNALA</string>
+
     <!-- Months -->
     <string name="january">Gennaio</string>
     <string name="february">Febbraio</string>
@@ -1053,8 +1051,7 @@
     <string name="multiplayer_ban">Banna giocatore</string>
     <string name="multiplayer_room_browser">Stanze pubbliche</string>
     <string name="multiplayer_no_rooms_found">Nessuna stanza pubblica trovata</string>
-    <string name="multiplayer_password_required">Paasword richiesta</string>
-    <string name="multiplayer_player_count">: %1$d/%2$d</string>
+    <string name="multiplayer_password_required">Password richiesta</string>
     <string name="multiplayer_game">Gioco</string>
     <string name="multiplayer_no_game_info">Qualunque gioco</string>
     <string name="multiplayer_password_protected">Stanza protetta da password</string>
@@ -1076,4 +1073,22 @@
     <string name="update_check_channel_stable">Stabile</string>
     <string name="update_check_channel_prerelease">Anteprima</string>
 
+    <!-- AzaharTrigger -->
+    <string name="core_error_memory_exception_raised">Rilevata eccezione della memoria</string>
+    <string name="memory_formatted">%1$s%2$s</string>
+    <string name="system_region_jpn">JPN</string>
+    <string name="system_region_usa">USA</string>
+    <string name="system_region_eur">EUR</string>
+    <string name="system_region_aus">AUS</string>
+    <string name="system_region_chn">CHN</string>
+    <string name="system_region_kor">KOR</string>
+    <string name="system_region_twn">TWN</string>
+    <string name="opengles">OpenGLES</string>
+    <string name="vulkan">Vulkan</string>
+    <string name="anime4k">Anime4K</string>
+    <string name="bicubic">Bicubic</string>
+    <string name="scaleforce">ScaleForce</string>
+    <string name="xbrz">xBRZ</string>
+    <string name="mmpx">MMPX</string>
+    <string name="multiplayer_player_count">: %1$d/%2$d</string>
 </resources>

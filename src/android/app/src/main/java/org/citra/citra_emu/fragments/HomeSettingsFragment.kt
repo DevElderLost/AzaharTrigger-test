@@ -1,8 +1,6 @@
-//FILE MODIFIED BY AzaharPlus APRIL 2025
-
-// Copyright 2023 Citra Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2023-2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 package org.citra.citra_emu.fragments
 
@@ -37,7 +35,7 @@ import org.citra.citra_emu.adapters.HomeSettingAdapter
 import org.citra.citra_emu.databinding.DialogSoftwareKeyboardBinding
 import org.citra.citra_emu.databinding.FragmentHomeSettingsBinding
 import org.citra.citra_emu.features.settings.SettingKeys
-import org.citra.citra_emu.features.settings.model.Settings
+import org.citra.citra_emu.features.settings.model.CitraSettings
 import org.citra.citra_emu.features.settings.ui.SettingsActivity
 import org.citra.citra_emu.features.settings.utils.SettingsFile
 import org.citra.citra_emu.model.Game
@@ -227,7 +225,7 @@ class HomeSettingsFragment : Fragment() {
                 R.string.preferences_theme,
                 R.string.theme_and_color_description,
                 R.drawable.ic_palette,
-                { SettingsActivity.launch(requireContext(), Settings.SECTION_THEME, "") }
+                { SettingsActivity.launch(requireContext(), CitraSettings.SECTION_THEME, "") }
             ),
             HomeSetting(
                 R.string.clear_streetpass_config,
@@ -355,7 +353,7 @@ class HomeSettingsFragment : Fragment() {
 
         binding.linearLayoutSettings.updatePadding(bottom = spacingNavigation)
 
-        if (ViewCompat.getLayoutDirection(view) == ViewCompat.LAYOUT_DIRECTION_LTR) {
+        if (view.layoutDirection == View.LAYOUT_DIRECTION_LTR) {
             binding.linearLayoutSettings.updatePadding(left = spacingNavigationRail)
         } else {
             binding.linearLayoutSettings.updatePadding(right = spacingNavigationRail)

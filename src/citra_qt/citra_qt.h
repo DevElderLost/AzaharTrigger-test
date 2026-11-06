@@ -1,13 +1,12 @@
-// FILE MODIFIED BY AzaharPlus APRIL 2025
-
-// Copyright Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2014-2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 #pragma once
 
 #include <array>
 #include <memory>
+#include <set>
 #include <vector>
 #ifdef __unix__
 #include <QDBusObjectPath>
@@ -102,6 +101,25 @@ enum class MediaType : u32;
 
 int LaunchQtFrontend(int argc, char* argv[]);
 
+class GApplicationEventFilter : public QObject {
+    Q_OBJECT
+
+public:
+    /** Holds a pointer to the hotkey registry so we can catch held hotkeys */
+    HotkeyRegistry* hotkey_registry = nullptr;
+
+signals:
+    void FileOpen(const QFileOpenEvent* event);
+    void SequencePressCaught(QKeySequence seq);
+    void SequenceReleaseCaught(QKeySequence seq);
+
+protected:
+    bool eventFilter(QObject* object, QEvent* event) override;
+
+private:
+    std::set<Hotkey*> hotkeys_currently_held{};
+};
+
 class GMainWindow : public QMainWindow {
     Q_OBJECT
 
@@ -110,6 +128,9 @@ class GMainWindow : public QMainWindow {
 
 public:
     void filterBarSetChecked(bool state);
+#ifdef _WIN32
+    void SetCustomWindowsScrollbar();
+#endif
     void UpdateUITheme();
 
     explicit GMainWindow(Core::System& system);
@@ -125,7 +146,8 @@ public:
     void AcceptDropEvent(QDropEvent* event);
 
     void OnFileOpen(const QFileOpenEvent* event);
-
+    void OnSequencePressed(QKeySequence seq);
+    void OnSequenceReleased(QKeySequence seq);
     void UninstallTitles(
         const std::vector<std::tuple<Service::FS::MediaType, u64, QString>>& titles);
 
@@ -154,6 +176,7 @@ signals:
     void UpdateProgress(std::size_t written, std::size_t total);
     void CIAInstallReport(Service::AM::InstallStatus status, QString filepath);
     void CompressFinished(bool is_compress, bool success);
+    void BundleFinished(bool is_bundle, bool success);
     void CIAInstallFinished();
     void InfoLEDColorChanged();
     // Signal that tells widgets to update icons to use the current theme
@@ -238,7 +261,6 @@ private:
                             const bool& skip_tryexec);
 
     void ShowCommandOutput(std::string title, std::string message);
-    void ShowFFmpegErrorMessage();
 
 private slots:
     void OnResumeGame(bool first_start);
@@ -272,6 +294,7 @@ private slots:
     void OnUpdateProgress(std::size_t written, std::size_t total);
     void OnCIAInstallReport(Service::AM::InstallStatus status, QString filepath);
     void OnCompressFinished(bool is_compress, bool success);
+    void OnBundleFinished(bool is_bundle, bool success);
     void OnCIAInstallFinished();
     void OnMenuRecentFile();
     void OnPreviousAmiibo();
@@ -312,16 +335,18 @@ private slots:
     void OnCloseMovie();
     void OnSaveMovie();
     void OnCaptureScreenshot();
-    void OnDumpVideo();
     void OnCompressFile();
     void OnDecompressFile();
-#ifdef _WIN32
-    void OnOpenFFmpeg();
-#endif
+    void OnCreateBundle();
+    void OnExtractBundle();
+#ifdef ENABLE_FFMPEG
+    void OnDumpVideo();
     void OnStartVideoDumping();
     void StartVideoDumping(const QString& path);
     void OnStopVideoDumping();
+#endif
     void OnCoreError(Core::System::ResultStatus, std::string);
+    bool ShowExceptionDialog(Core::System::ResultStatus result, const std::string& details);
     /// Called whenever a user selects Help->About Azahar
     void OnMenuAboutCitra();
 
@@ -368,7 +393,7 @@ private:
     std::unique_ptr<Ui::MainWindow> ui;
     Core::System& system;
     Core::Movie& movie;
-
+    GApplicationEventFilter* filter = new GApplicationEventFilter();
     GRenderWindow* render_window;
     std::unique_ptr<VirtualTouchPointer> virtual_touch_pointer;
     GRenderWindow* secondary_window;
@@ -498,16 +523,6 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void showEvent(QShowEvent* event) override;
-};
-
-class GApplicationEventFilter : public QObject {
-    Q_OBJECT
-
-signals:
-    void FileOpen(const QFileOpenEvent* event);
-
-protected:
-    bool eventFilter(QObject* object, QEvent* event) override;
 };
 
 Q_DECLARE_METATYPE(std::size_t);

@@ -1,8 +1,6 @@
-// FILE MODIFIED BY AzaharPlus APRIL 2025
-
-// Copyright Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2024-2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 #include <clocale>
 #include <iostream>
@@ -71,7 +69,9 @@
 #ifdef USE_DISCORD_PRESENCE
 #include "citra_qt/discord.h"
 #endif
+#ifdef ENABLE_FFMPEG
 #include "citra_qt/dumping/dumping_dialog.h"
+#endif
 #include "citra_qt/game_list.h"
 #include "citra_qt/hotkeys.h"
 #include "citra_qt/loading_screen.h"
@@ -91,7 +91,7 @@
 #include "citra_qt/util/util.h"
 #include "common/arch.h"
 #include "common/common_paths.h"
-#include "common/dynamic_library/dynamic_library.h"
+#include "common/dynamic_library.h"
 #include "common/file_util.h"
 #include "common/literals.h"
 #include "common/logging/backend.h"
@@ -105,6 +105,7 @@
 #include "common/settings.h"
 #include "common/string_util.h"
 #include "common/zstd_compression.h"
+#include "core/arm/exception_handler.h"
 #include "core/core.h"
 #include "core/dumping/backend.h"
 #include "core/file_sys/archive_extsavedata.h"
@@ -119,7 +120,6 @@
 #include "core/savestate.h"
 #include "core/system_titles.h"
 #include "input_common/main.h"
-#include "network/network_settings.h"
 #include "ui_main.h"
 #include "video_core/gpu.h"
 #include "video_core/renderer_base.h"
@@ -234,9 +234,19 @@ static QString PrettyProductName() {
 
 void GMainWindow::ShowCommandOutput(std::string title, std::string message) {
 #ifdef _WIN32
-    boost::replace_all(message, " ", "\u00a0"); // Non-breaking space
-    boost::replace_all(message, "-", "\u2011"); // Non-breaking hyphen
-    QMessageBox::information(this, QString::fromStdString(title), QString::fromStdString(message));
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    BOOL isSTDOutputHandled = h != nullptr && h != INVALID_HANDLE_VALUE;
+
+    if (isSTDOutputHandled) {
+        std::cout << message << std::endl;
+    } else {
+        boost::replace_all(message, " ", "\u00a0"); // Non-breaking space
+        boost::replace_all(message, "-", "\u2011"); // Non-breaking hyphen
+        QMessageBox::information(this, QString::fromStdString(title),
+                                 QString::fromStdString(message));
+    }
+
 #else
     std::cout << message << std::endl;
 #endif
@@ -245,7 +255,8 @@ void GMainWindow::ShowCommandOutput(std::string title, std::string message) {
 bool IsPrereleaseBuild() {
     return ((strstr(Common::g_build_fullname, "alpha") != NULL) ||
             (strstr(Common::g_build_fullname, "beta") != NULL) ||
-            (strstr(Common::g_build_fullname, "rc") != NULL));
+            (strstr(Common::g_build_fullname, "rc") != NULL) ||
+            (strstr(Common::g_build_fullname, "test") != NULL));
 }
 
 #ifdef ENABLE_QT_UPDATE_CHECKER
@@ -302,980 +313,992 @@ static bool IsVersionNewer(const std::string& current, const std::string& latest
 // from the db in https://github.com/8bitDream/AmiiboAPI
 
 static std::map<std::string, std::string> amiibos = {
-    {"@0438000103000502", "Sandy"},
-    {"@0181010100b40502", "Isabelle - Winter"},
-    {"@3200000000300002", "Sonic"},
-    {"@029e0001013d0502", "Ava"},
-    {"@01b3000100b50502", "Blanca"},
-    {"@02f8000101380502", "Mac"},
-    {"@023c000100bd0502", "Lucha"},
-    {"@0263000100750502", "Punchy"},
-    {"@03700001015d0502", "Violet"},
-    {"@07c0000000210002", "Mii Brawler"},
-    {"@09c5020102830e02", "Wario - Baseball"},
-    {"@026c000100c30502", "Tom"},
-    {"@0101030004140902", "Zelda and Loftwing"},
-    {"@04e6000100820502", "Mint"},
-    {"@04e3000101650502", "Caroline"},
-    {"@0188000101120502", "Mabel"},
-    {"@0800010004150402", "Inkling - Yellow"},
-    {"@0807000004330402", "Shiver"},
-    {"@0808000004340402", "Frye"},
-    {"@0809000004350402", "Big Man"},
-    {"@0a1d000103d40502", "Frett"},
-    {"@035d000100c90502", "Kidd"},
-    {"@1f400000035e1002", "Qbby"},
-    {"@09c6010102870e02", "Waluigi - Soccer"},
-    {"@0264000101ac0502", "Purrl"},
-    {"@025e000101250502", "Mitzi"},
-    {"@0a10000103c70502", "Reneigh"},
-    {"@047a000100600502", "Rasher"},
-    {"@04a10001016f0502", "Chrissy"},
-    {"@09d0030102bb0e02", "Metal Mario - Tennis"},
-    {"@01910001004e0502", "Harriet"},
-    {"@02f1000101450502", "Daisy"},
-    {"@02d7000101300502", "Bam"},
-    {"@02030001019a0502", "Anabelle"},
-    {"@0189000100ab0502", "Labelle"},
-    {"@3841000104251902", "Tatsuhisa “Luke” Kamijō"},
-    {"@08060100041c0402", "Smallfry"},
-    {"@0800010003820002", "Inkling"},
-    {"@018d0001010c0502", "Rover"},
-    {"@01a7000101140502", "Wendell"},
-    {"@04ba0001005d0502", "Renée"},
-    {"@0489000100ef0502", "Agnes"},
-    {"@018e010101780502", "Resetti - Without Hat"},
-    {"@0a04000103b50502", "Daisy Mae"},
-    {"@026d0001013f0502", "Merry"},
-    {"@03250001010a0502", "Big Top"},
-    {"@01b4000101130502", "Leif"},
-    {"@0390000101850502", "Rocco"},
-    {"@09c7050102900e02", "Donkey Kong - Horse Racing"},
-    {"@0437000101050502", "Gladys"},
-    {"@0230000101d20502", "Twiggy"},
-    {"@033b000100fa0502", "Camofrog"},
-    {"@01c1000002440502", "Lottie"},
-    {"@00c00000037b0002", "King K. Rool"},
-    {"@3845000104291902", "Nail Saionji"},
-    {"@3601000004210002", "Sephiroth"},
-    {"@02da000101330502", "Deirdre"},
-    {"@0a03000103b40502", "Flick"},
-    {"@2102000000290002", "Lucina"},
-    {"@02b80001019c0502", "Naomi"},
-    {"@0347000103020502", "Raddle"},
-    {"@01b0000100520502", "Tortimer"},
-    {"@018c000002430502", "Digby"},
-    {"@033e000101a20502", "Puddles"},
-    {"@08050200038f0402", "Octoling Boy"},
-    {"@0140000003550902", "Guardian"},
-    {"@1907000003840002", "Squirtle"},
-    {"@00020003039dff02", "Peach - Power Up Band"},
-    {"@0238000102f80502", "Jacob"},
-    {"@0017000002680102", "Boo"},
-    {"@035e0001018e0502", "Pashmina"},
-    {"@0328000102eb0502", "Paolo"},
-    {"@028a000102e90502", "June"},
-    {"@3740000103741402", "Super Mario Cereal"},
-    {"@0100000000040002", "Link"},
-    {"@3600000002590002", "Cloud"},
-    {"@02710001019b0502", "Rudy"},
-    {"@0384000100860502", "Flurry"},
-    {"@028e0001019e0502", "Tammy"},
-    {"@0214000100e40502", "Teddy"},
-    {"@04510001015e0502", "Frank"},
-    {"@09c2050102770e02", "Peach - Horse Racing"},
-    {"@024d000102f60502", "Stu"},
-    {"@03a8000100910502", "Roscoe"},
-    {"@2101000000180002", "Ike"},
-    {"@09c1040102710e02", "Luigi - Golf"},
-    {"@0381000100d50502", "Rodney"},
-    {"@09cc010102a50e02", "Baby Mario - Soccer"},
-    {"@3805000103981702", "Daijobu"},
-    {"@02d9000101c80502", "Bruce"},
-    {"@040f000101500502", "Bree"},
-    {"@04fd0001007b0502", "Bangle"},
-    {"@0282000101810502", "Stitches"},
-    {"@045f000101a80502", "Aurora"},
-    {"@046a000101d00502", "Iggly"},
-    {"@0252000100fe0502", "Vic"},
-    {"@35050000040c0f02", "Razewing Ratha"},
-    {"@35060000040d0f02", "Ena"},
-    {"@3509000004101802", "Palico"},
-    {"@35090100042b1802", "Palico"},
-    {"@350b0000042d1802", "Malzeno"},
-    {"@350c000004fa0f02", "Ratha"},
-    {"@350d000004fb0f02", "Ratha V"},
-    {"@350e000004fc0f02", "Rudy"},
-    {"@3580000005062102", "Diana"},
-    {"@000000030430ff02", "Golden - Power Up Band"},
-    {"@044c0001008e0502", "Amelia"},
-    {"@0313000101210502", "Miranda"},
-    {"@01a5000101720502", "Katrina"},
-    {"@0a0c000103c30502", "Audie"},
-    {"@09c8050102950e02", "Diddy Kong - Horse Racing"},
-    {"@0307000100640502", "Bill"},
-    {"@022f0001011e0502", "Anchovy"},
-    {"@0a05000103b80502", "Harvey"},
-    {"@0100000003530902", "Link - Archer"},
-    {"@0186010100af0502", "Tommy - Uniform"},
-    {"@08050100038e0402", "Octoling Girl"},
-    {"@01000000034f0902", "8-Bit Link"},
-    {"@0482000102fd0502", "Maggie"},
-    {"@3480000003791502", "Mega Man"},
-    {"@0a00000103ab0502", "Orville"},
-    {"@032e0101031c0502", "Chai"},
-    {"@0a0b000103c20502", "Dom"},
-    {"@01960000024e0502", "Kapp'n"},
-    {"@040d000100780502", "Limberg"},
-    {"@0312000103090502", "Weber"},
-    {"@04940001009a0502", "Bunnie"},
-    {"@00800102035d0302", "Poochy"},
-    {"@09c6030102890e02", "Waluigi - Tennis"},
-    {"@01a00001010f0502", "Pelly"},
-    {"@033a000101cc0502", "Frobert"},
-    {"@09ce050102b30e02", "Birdo - Horse Racing"},
-    {"@04ea000103180502", "Tasha"},
-    {"@022e000101d30502", "Robin"},
-    {"@02c3000100dc0502", "Alfonso"},
-    {"@023e000100d10502", "Peck"},
-    {"@09cd020102ab0e02", "Baby Luigi - Baseball"},
-    {"@0004000002620102", "Rosalina"},
-    {"@0004010004ea0102", "Rosalina and Lumas"},
-    {"@018b000002460502", "Cyrus"},
-    {"@04d0000101960502", "Frita"},
-    {"@046d000100f30502", "Sprinkle"},
-    {"@040e000100880502", "Bella"},
-    {"@02cb000101360502", "Drago"},
-    {"@0199000101160502", "Grams"},
-    {"@21050000025a0002", "Corrin"},
-    {"@04a3000101c90502", "OHare"},
-    {"@0741000000200002", "Dark Pit"},
-    {"@0004010000130002", "Rosalina && Luma"},
-    {"@01a80001004f0502", "Redd"},
-    {"@0188000002410502", "Mabel"},
-    {"@0385000101060502", "Hamphrey"},
-    {"@01ab0001017c0502", "Pave"},
-    {"@09c5010102820e02", "Wario - Soccer"},
-    {"@02c4000100670502", "Alli"},
-    {"@09c4040102800e02", "Yoshi - Golf"},
-    {"@02ee000101990502", "Bones"},
-    {"@05c4000004131302", "E.M.M.I."},
-    {"@0100000003540902", "Link - Rider"},
-    {"@04980001014a0502", "Gaston"},
-    {"@03180001006c0502", "Quillson"},
-    {"@09d1010102be0e02", "Pink Gold Peach - Soccer"},
-    {"@0700000000070002", "Wii Fit Trainer"},
-    {"@00070000001a0002", "Wario"},
-    {"@22c00000003a0202", "Chibi Robo"},
-    {"@00090000000d0002", "Diddy Kong"},
-    {"@01ac0001017f0502", "Zipper"},
-    {"@044d000101930502", "Pierce"},
-    {"@3801000103941702", "Ikari"},
-    {"@0100010003500902", "Toon Link - The Wind Waker"},
-    {"@3640000003a20002", "Hero"},
-    {"@0196000100480502", "Kapp'n"},
-    {"@00010003039cff02", "Luigi - Power Up Band"},
-    {"@08000100003e0402", "Inkling Girl"},
-    {"@050c000101c10502", "Lobo"},
-    {"@0101000003560902", "Zelda"},
-    {"@3502010002e40f02", "Rathian and Cheval"},
-    {"@09c60501028b0e02", "Waluigi - Horse Racing"},
-    {"@0a18000103cf0502", "Quinn"},
-    {"@018c0001004c0502", "Digby"},
-    {"@01000000037c0002", "Young Link"},
-    {"@0343000102ef0502", "Huck"},
-    {"@0450000100cf0502", "Avery"},
-    {"@03d3000102f30502", "Carrie"},
-    {"@0261000100650502", "Kiki"},
-    {"@01810000024b0502", "Isabelle - Summer Outfit"},
-    {"@03da000101510502", "Rooney"},
-    {"@02190001007e0502", "Nate"},
-    {"@09d0010102b90e02", "Metal Mario - Soccer"},
-    {"@049a0001014e0502", "Pippy"},
-    {"@0003000000020002", "Yoshi"},
-    {"@09ce030102b10e02", "Birdo - Tennis"},
-    {"@22420000041f0002", "Mythra"},
-    {"@03720001010b0502", "Rocket"},
-    {"@03ac000101880502", "Peaches"},
-    {"@02a6000101240502", "Ken"},
-    {"@08000200003f0402", "Inkling Boy"},
-    {"@0001000000350102", "Luigi"},
-    {"@019a000100b70502", "Chip"},
-    {"@04ff000101620502", "Claudia"},
-    {"@041c000101410502", "Greta"},
-    {"@2107000003611202", "Celica"},
-    {"@030b000100790502", "Deena"},
-    {"@1902000003830002", "Ivysaur"},
-    {"@04df000100e80502", "Filbert"},
-    {"@035c000101290502", "Velma"},
-    {"@02210001013c0502", "Beardo"},
-    {"@0a1e000103d50502", "Azalea"},
-    {"@05c0000000060002", "Samus"},
-    {"@05c00000043b1302", "Samus"},
-    {"@05c00000043a1302", "Samus && Vi-O-La"},
-    {"@05c50000043c1302", "Sylux"},
-    {"@37c00000038b0002", "Simon"},
-    {"@35080000040f1802", "Magnamalo"},
-    {"@09cf030102b60e02", "Rosalina - Tennis"},
-    {"@09cb040102a30e02", "Boo - Golf"},
-    {"@03ff000100f40502", "Flip"},
-    {"@04ef0001013b0502", "Hazel"},
-    {"@0392000101270502", "Bubbles"},
-    {"@03a7000101a10502", "Elmer"},
-    {"@02c5000103080502", "Boots"},
-    {"@0005ff00023a0702", "Hammer Slam Bowser"},
-    {"@02f4000103050502", "Bea"},
-    {"@036b0001018b0502", "Boone"},
-    {"@0a08000103bd0502", "Wardell"},
-    {"@0a16000103cd0502", "Petri"},
-    {"@0a1b000103d20502", "Ace"},
-    {"@07c0010000220002", "Mii Swordfighter"},
-    {"@3842000104261902", "Gakuto Sōgetsu"},
-    {"@3c80000003a40002", "Terry Bogard"},
-    {"@09c30501027c0e02", "Daisy - Horse Racing"},
-    {"@37800000038a0002", "Snake"},
-    {"@01ae0001011b0502", "Franklin"},
-    {"@1d01000003750d02", "Detective Pikachu"},
-    {"@0462000100f60502", "Hopper"},
-    {"@350a0100042c1802", "Palamute"},
-    {"@03af0001012c0502", "Colton"},
-    {"@0440000100ca0502", "Phoebe"},
-    {"@021c000102f70502", "Ursala"},
-    {"@02ca000101ca0502", "Gayle"},
-    {"@00130000037a0002", "Daisy"},
-    {"@047c000101a00502", "Lucy"},
-    {"@04eb000102f00502", "Sylvana"},
-    {"@0358000102fa0502", "Billy"},
-    {"@021b000100800502", "Tutu"},
-    {"@0a07000103bc0502", "Niko"},
-    {"@021d000101cd0502", "Grizzly"},
-    {"@0181000100440502", "Isabelle"},
-    {"@04a2000102e80502", "Hopkins"},
-    {"@0311000100d60502", "Scoot"},
-    {"@03bf000101bc0502", "Sydney"},
-    {"@04140001030a0502", "Candi"},
-    {"@04d30101031b0502", "Étoile"},
-    {"@03290001009d0502", "Axel"},
-    {"@04fb000101c60502", "Rowan"},
-    {"@025f000101d70502", "Rosie - Amiibo Festival"},
-    {"@01940000024a0502", "Kicks"},
-    {"@3500020002e20f02", "One-Eyed Rathalos and Rider - Female"},
-    {"@019d000100ac0502", "Copper"},
-    {"@0233000103060502", "Admiral"},
-    {"@043c000101cb0502", "Cranston"},
-    {"@05840000037e0002", "Wolf"},
-    {"@037f000101aa0502", "Apple"},
-    {"@018e000002490502", "Resetti"},
-    {"@09c3010102780e02", "Daisy - Soccer"},
-    {"@1919000000090002", "Pikachu"},
-    {"@03fd000101580502", "Monty"},
-    {"@0206000103120502", "Snooty"},
-    {"@00030102023e0302", "Mega Yarn Yoshi"},
-    {"@02a3000102ff0502", "Plucky"},
-    {"@049c000101400502", "Genji"},
-    {"@01850001004b0502", "Timmy"},
-    {"@0314000102f40502", "Ketchup"},
-    {"@01030000024f0902", "Midna && Wolf Link"},
-    {"@00010000000c0002", "Luigi"},
-    {"@0001000404401c02", "Luigi - My Mario Wooden Blocks"},
-    {"@0189010103b10502", "Label"},
-    {"@3dc0000004220002", "Steve"},
-    {"@01840000024d0502", "Timmy && Tommy"},
-    {"@21000000000b0002", "Marth"},
-    {"@0195000100b00502", "Porter"},
-    {"@0003000000370102", "Yoshi"},
-    {"@0003000404421c02", "Yoshi - My Mario Wooden Blocks"},
-    {"@030f0001016d0502", "Derwin"},
-    {"@07810000002e0002", "R.O.B. - Famicom"},
-    {"@3600010003620002", "Cloud - Player 2"},
-    {"@02090001019f0502", "Olaf"},
-    {"@04b3000100dd0502", "Rhonda"},
-    {"@09c60401028a0e02", "Waluigi - Golf"},
-    {"@21080000036f1202", "Chrom"},
-    {"@09ce040102b20e02", "Birdo - Golf"},
-    {"@09c5040102850e02", "Wario - Golf"},
-    {"@0369000100d30502", "Cesar"},
-    {"@3380000003781402", "Solaire of Astora"},
-    {"@3844000104281902", "Roa Kirishima"},
-    {"@0215000101820502", "Pinky"},
-    {"@0286000103130502", "Olive"},
-    {"@078f000003810002", "Ice Climbers"},
-    {"@38460001042a1902", "Asana Mutsuba"},
-    {"@01830101010e0502", "Tom Nook - Jacket"},
-    {"@0416000100fb0502", "Anicotti"},
-    {"@09c0010102690e02", "Mario - Soccer"},
-    {"@03490001018d0502", "Croque"},
-    {"@0105000003580902", "Daruk"},
-    {"@010b000004a50902", "Tulin"},
-    {"@010c000004a60902", "Yunobo"},
-    {"@010a000004a40902", "Sidon"},
-    {"@0109000004a30902", "Riju"},
-    {"@0486000100fc0502", "Chops"},
-    {"@35c0000003920a02", "Shovel Knight - Gold Edition"},
-    {"@0005000003730102", "Bowser - Wedding"},
-    {"@0182010100460502", "DJ KK"},
-    {"@01a6000103b70502", "Saharah"},
-    {"@02310001006a0502", "Jitters"},
-    {"@01070000035a0902", "Mipha"},
-    {"@35070000040e0f02", "Tsukino"},
-    {"@0251000100c10502", "Coach"},
-    {"@02df000101910502", "Erik"},
-    {"@03fc000101470502", "Tammi"},
-    {"@03480001006b0502", "Gigi"},
-    {"@02ed0001015a0502", "Biskit"},
-    {"@34c1000003890002", "Ken"},
-    {"@0187000100470502", "Sable"},
-    {"@0190000101710502", "Brewster"},
-    {"@03c50001015c0502", "Lyman"},
-    {"@0200000100a10502", "Cyrano"},
-    {"@0418000100d80502", "Broccolo"},
-    {"@03a9000100710502", "Winnie"},
-    {"@0235000100840502", "Midge"},
-    {"@04e8000101ce0502", "Cally"},
-    {"@3504010002e60f02", "Qurupeco and Dan"},
-    {"@0283000100c70502", "Vladimir"},
-    {"@03ea0001030b0502", "Leopold"},
-    {"@030a000101c70502", "Maelle"},
-    {"@08010000025d0402", "Callie"},
-    {"@0801000004360402", "Callie - Alterna"},
-    {"@04a80101031e0502", "Toby"},
-    {"@0496000100d90502", "Coco"},
-    {"@0439000103110502", "Sprocket"},
-    {"@01ad000100b80502", "Jack"},
-    {"@3800000103931702", "Pawapuro"},
-    {"@3b40000003a30002", "Banjo && Kazooie"},
-    {"@03d7000101b40502", "Sylvia"},
-    {"@050e000100d70502", "Whitney"},
-    {"@01a80101017e0502", "Redd - Shirt"},
-    {"@0a400000041d0002", "Min Min"},
-    {"@09c2010102730e02", "Peach - Soccer"},
-    {"@0a09000103c00502", "Sherb"},
-    {"@026a000101460502", "Stinky"},
-    {"@04a00001016e0502", "Francine"},
-    {"@0460000100a50502", "Roald"},
-    {"@09cb050102a40e02", "Boo - Horse Racing"},
-    {"@02680001007d0502", "Monique"},
-    {"@04fc000102ee0502", "Tybalt"},
-    {"@03be000101980502", "Melba"},
-    {"@09c10101026e0e02", "Luigi - Soccer"},
-    {"@2108000003880002", "Chrom"},
-    {"@1f01000000270002", "Meta Knight"},
-    {"@1f01000004c61e03", "Meta Knight (&& Shadow Star)"},
-    {"@04e1000101be0502", "Nibbles"},
-    {"@08020000025e0402", "Marie"},
-    {"@0802000004370402", "Marie - Alterna"},
-    {"@028f0101031a0502", "Marty"},
-    {"@047d0001012e0502", "Spork - Crackle"},
-    {"@09cb010102a00e02", "Boo - Soccer"},
-    {"@35c30000036e0a02", "King Knight"},
-    {"@0800030000400402", "Inkling Squid"},
-    {"@034b0001009f0502", "Henry"},
-    {"@0192000002470502", "Blathers"},
-    {"@01080000035b0902", "Revali"},
-    {"@04cf000100e10502", "Timbra"},
-    {"@03aa000100e60502", "Ed"},
-    {"@0187000103b00502", "Sable"},
-    {"@0453000101040502", "Keaton"},
-    {"@047b000100f50502", "Hugh"},
-    {"@033d0001013a0502", "Wart Jr."},
-    {"@0194000100aa0502", "Kicks"},
-    {"@01b1000100b20502", "Shrunk"},
-    {"@03c6000100930502", "Eugene"},
-    {"@04e0000100f70502", "Pecan"},
-    {"@1ac0000000110002", "Lucario"},
-    {"@023f000101660502", "Sparro"},
-    {"@0101000003520902", "Toon Zelda - The Wind Waker"},
-    {"@0181030101700502", "Isabelle - Dress"},
-    {"@0266000100680502", "Kabuki"},
-    {"@0326000101390502", "Eloise"},
-    {"@04850001014c0502", "Gala"},
-    {"@046b000101970502", "Tex"},
-    {"@018a000002450502", "Reese"},
-    {"@0500000100e70502", "Bianca"},
-    {"@0000000000340102", "Mario"},
-    {"@00000004043f1c02", "Mario - My Mario Wooden Blocks"},
-    {"@07c0020000230002", "Mii Gunner"},
-    {"@0002000003720102", "Peach - Wedding"},
-    {"@0a17000103ce0502", "Cephalobot"},
-    {"@0464000100c00502", "Gwen"},
-    {"@09c70101028c0e02", "Donkey Kong - Soccer"},
-    {"@0487000101bf0502", "Kevin"},
-    {"@04de000100ce0502", "Blaire"},
-    {"@050d000101420502", "Wolfgang"},
-    {"@09c40301027f0e02", "Yoshi - Tennis"},
-    {"@018e000100490502", "Resetti"},
-    {"@0483000101b00502", "Peggy"},
-    {"@01000000034d0902", "Link - Twilight Princess"},
-    {"@036e000102fb0502", "Boyd"},
-    {"@3500010002e10f02", "One-Eyed Rathalos and Rider - Male"},
-    {"@0499000100df0502", "Gabi"},
-    {"@024f000100810502", "T-Bone"},
-    {"@09c5030102840e02", "Wario - Tennis"},
-    {"@0580000000050002", "Fox"},
-    {"@0800030002610402", "Inkling Squid - Orange"},
-    {"@01020100041a0902", "Ganondorf - Tears of the Kingdom"},
-    {"@0481000102f10502", "Boris"},
-    {"@02010001016a0502", "Antonio"},
-    {"@0284000102fe0502", "Murphy"},
-    {"@0468000102f20502", "Wade"},
-    {"@0282000101d60502", "Stitches - Amiibo Festival"},
-    {"@01a40001004d0502", "Pascal"},
-    {"@0a06000103ba0502", "Wisp"},
-    {"@02dc000100be0502", "Fuchsia"},
-    {"@1927000000260002", "Jigglypuff"},
-    {"@032c000101480502", "Tucker"},
-    {"@01000000034b0902", "Link - Ocarina of Time"},
-    {"@09cb020102a10e02", "Boo - Baseball"},
-    {"@09c2040102760e02", "Peach - Golf"},
-    {"@03e70001012a0502", "Elvis"},
-    {"@19ac000003850002", "Pichu"},
-    {"@0803000003760402", "Pearl"},
-    {"@0803000004380402", "Pearl - Side Order"},
-    {"@0a14000103cb0502", "Shino"},
-    {"@01000000034c0902", "Link - Majora's Mask"},
-    {"@01c10101017a0502", "Lottie - Black Skirt And Bow"},
-    {"@0513000102e70502", "Vivian"},
-    {"@041b000100f10502", "Bettina"},
-    {"@3dc1000004230002", "Alex"},
-    {"@01aa000100530502", "Lyle"},
-    {"@02f0000100a70502", "Walker"},
-    {"@03c1000100bb0502", "Ozzie"},
-    {"@0008ff00023b0702", "Turbo Charge Donkey Kong"},
-    {"@0452000100730502", "Sterling"},
-    {"@0181000101d40502", "Isabelle - Character Parfait"},
-    {"@049f000103010502", "Claude"},
-    {"@02ea000101d50502", "Goldie - Amiibo Festival"},
-    {"@02d6000100560502", "Fauna"},
-    {"@0270000100ff0502", "Ankha"},
-    {"@01a2000103b90502", "Gulliver"},
-    {"@0267000101080502", "Kid Cat"},
-    {"@3843000104271902", "Romin Kirishima"},
-    {"@0272000101860502", "Katt"},
-    {"@00240000038d0002", "Piranha Plant"},
-    {"@03e8000102f50502", "Rex"},
-    {"@02dd000100ea0502", "Beau"},
-    {"@01410000035c0902", "Bokoblin"},
-    {"@09cf020102b50e02", "Rosalina - Baseball"},
-    {"@19960000023d0002", "Mewtwo"},
-    {"@0393000100a00502", "Bertha"},
-    {"@1d000001025c0d02", "Shadow Mewtwo"},
-    {"@04650001006e0502", "Puck"},
-    {"@0106000003590902", "Urbosa"},
-    {"@025f000101c50502", "Rosie"},
-    {"@210b000003a50002", "Byleth"},
-    {"@04b40001030c0502", "Spike"},
-    {"@0100000003990902", "Link - Link's Awakening"},
-    {"@041a000100e00502", "Moose"},
-    {"@0000000002390602", "8-Bit Mario Modern Color"},
-    {"@04800001008d0502", "Cobb"},
-    {"@09c8010102910e02", "Diddy Kong - Soccer"},
-    {"@02ef000100580502", "Portia"},
-    {"@029a000100ee0502", "Benedict"},
-    {"@0280000100830502", "Pudge"},
-    {"@022d000100f20502", "Jay"},
-    {"@35c0000002500a02", "Shovel Knight"},
-    {"@38c0000003911602", "Loot Goblin"},
-    {"@02690001011f0502", "Tabby"},
-    {"@0281000101200502", "Kody"},
-    {"@09ca0501029f0e02", "Bowser Jr. - Horse Racing"},
-    {"@044b0001016c0502", "Apollo"},
-    {"@0184050103a90502", "Timmy && Tommy"},
-    {"@027e000101690502", "Maple"},
-    {"@0000010000190002", "Dr. Mario"},
-    {"@09cc050102a90e02", "Baby Mario - Horse Racing"},
-    {"@09cd030102ac0e02", "Baby Luigi - Tennis"},
-    {"@0208000100960502", "Annalisa"},
-    {"@032d000100bc0502", "Tia"},
-    {"@03bc0001008a0502", "Yuka"},
-    {"@0183000002420502", "Tom Nook"},
-    {"@0309000100c60502", "Pate"},
-    {"@1f000000000a0002", "Kirby"},
-    {"@04a4000100d40502", "Carmen"},
-    {"@019c000101730502", "Phineas"},
-    {"@03380001011d0502", "Lily"},
-    {"@025d000100550502", "Bob"},
-    {"@3501000002e30f02", "Nabiru"},
-    {"@018b000101150502", "Cyrus"},
-    {"@350a000004111802", "Palamute"},
-    {"@0181040103aa0502", "Isabelle"},
-    {"@33c0000004200002", "Kazuya"},
-    {"@05810000001c0002", "Falco"},
-    {"@03a6000100c80502", "Savannah"},
-    {"@2281000002510002", "Lucas"},
-    {"@043d0001007c0502", "Phil"},
-    {"@019f000101110502", "Pete"},
-    {"@0380000101870502", "Graham"},
-    {"@3503010002e50f02", "Barioth and Ayuria"},
-    {"@030e0001012f0502", "Freckles"},
-    {"@0a1f000103d60502", "Roswell"},
-    {"@0005000000140002", "Bowser"},
-    {"@02fa000100970502", "Benjamin"},
-    {"@05c0000004121302", "Samus - Metroid Dread"},
-    {"@02db0001005e0502", "Lopez"},
-    {"@04cc000100a40502", "Willow"},
-    {"@03450001005f0502", "Jambette"},
-    {"@1906000000240002", "Charizard"},
-    {"@04a7000101a60502", "Mira"},
-    {"@0000030003a60102", "Mario - Cat"},
-    {"@01b10101017b0502", "Shrunk - Loud Jacket"},
-    {"@0a0f000103c60502", "Raymond"},
-    {"@0a12000103c90502", "Ione"},
-    {"@0317000100a60502", "Molly"},
-    {"@01a9000101760502", "Gracie"},
-    {"@2109000003701202", "Tiki"},
-    {"@0373000101340502", "Hans"},
-    {"@019b000100b60502", "Nat"},
-    {"@0186030101750502", "Tommy - Suit"},
-    {"@3480000002580002", "Mega Man - Gold Edition"},
-    {"@0185020101170502", "Timmy - Full Apron"},
-    {"@0101000004190902", "Zelda - Tears of the Kingdom"},
-    {"@026e000100ba0502", "Felicity"},
-    {"@01a20001017d0502", "Gulliver"},
-    {"@09c6020102880e02", "Waluigi - Baseball"},
-    {"@01920001010d0502", "Blathers"},
-    {"@1f00000002540c02", "Kirby"},
-    {"@024b000101260502", "Rodeo"},
-    {"@09cc040102a80e02", "Baby Mario - Golf"},
-    {"@03d1000100c20502", "Kitt"},
-    {"@0344000100c50502", "Prince"},
-    {"@0182000101d80502", "K. K. Slider - Pikopuri"},
-    {"@06400100001e0002", "Olimar"},
-    {"@03ae000100870502", "Clyde"},
-    {"@049d000100ed0502", "Ruby"},
-    {"@021a000100da0502", "Groucho"},
-    {"@1f02000000280002", "King Dedede"},
-    {"@2104000002520002", "Roy"},
-    {"@0000000003710102", "Mario - Wedding"},
-    {"@0003010200430302", "Light Blue Yarn Yoshi"},
-    {"@04c6000101670502", "Baabara"},
-    {"@07800000002d0002", "Mr. Game && Watch"},
-    {"@0600000000120002", "Captain Falcon"},
-    {"@04e5000101ad0502", "Static"},
-    {"@0411000101ab0502", "Rod"},
-    {"@0395000102fc0502", "Bitty"},
-    {"@0002010003a70102", "Peach - Cat"},
-    {"@044e000103150502", "Buzz"},
-    {"@0192000103ad0502", "Blathers"},
-    {"@04a5000100740502", "Bonbon"},
-    {"@04fa000101680502", "Rolf"},
-    {"@0436000101940502", "Queenie"},
-    {"@02de0001009c0502", "Diana"},
-    {"@3803000103961702", "Hayakawa"},
-    {"@03bd000100f90502", "Alice"},
-    {"@0007000002630102", "Wario"},
-    {"@021e000101230502", "Paula"},
-    {"@09d0040102bc0e02", "Metal Mario - Golf"},
-    {"@0232000102ea0502", "Piper"},
-    {"@1f01000002550c02", "Meta Knight"},
-    {"@0339000101b10502", "Ribbot"},
-    {"@04b6000102ec0502", "Hornsby"},
-    {"@0185040101790502", "Timmy - Suit"},
-    {"@0a01000103ac0502", "Wilbur"},
-    {"@032a000103070502", "Ellie"},
-    {"@027d000100630502", "Bluebear"},
-    {"@0006000000150002", "Bowser Jr."},
-    {"@22400000002b0002", "Shulk"},
-    {"@0013000002660102", "Daisy"},
-    {"@09c9010102960e02", "Bowser - Soccer"},
-    {"@04e4000101b60502", "Sally"},
-    {"@0a11000103c80502", "Sasha"},
-    {"@21030000002a0002", "Robin"},
-    {"@02b1000100690502", "Patty"},
-    {"@0316000101c00502", "Gloria"},
-    {"@0182000100a80502", "K.K. Slider"},
-    {"@03fb000101cf0502", "Simon"},
-    {"@0100000004180902", "Link - Tears of the Kingdom"},
-    {"@03b0000101a90502", "Papi"},
-    {"@0324000101890502", "Dizzy"},
-    {"@0217000101b30502", "Chow"},
-    {"@02b2000100c40502", "Tipper"},
-    {"@04fe000100590502", "Leonardo"},
-    {"@0100010000160002", "Toon Link"},
-    {"@0202000101030502", "Pango"},
-    {"@0781000000330002", "R.O.B. - NES"},
-    {"@09d1020102bf0e02", "Pink Gold Peach - Baseball"},
-    {"@3340000000320002", "Pac-Man"},
-    {"@0a15000103cc0502", "Marlo"},
-    {"@09c1030102700e02", "Luigi - Tennis"},
-    {"@01c1000100540502", "Lottie"},
-    {"@09c2030102750e02", "Peach - Tennis"},
-    {"@027f000100b90502", "Poncho"},
-    {"@03ec000101830502", "Mott"},
-    {"@042b000101af0502", "Zucker"},
-    {"@00130003039eff02", "Daisy - Power Up Band"},
-    {"@3480000000310002", "Mega Man"},
-    {"@035a000100850502", "Gruff"},
-    {"@05c1000003661302", "Metroid"},
-    {"@030c000101b80502", "Pompom"},
-    {"@0193000103ae0502", "Celeste"},
-    {"@04c90001030d0502", "Cashmere"},
-    {"@034a000101430502", "Diva"},
-    {"@0479000100920502", "Truffles"},
-    {"@042a0001012d0502", "Marina"},
-    {"@03fa000100d00502", "Nana"},
-    {"@09ca0301029d0e02", "Bowser Jr. - Tennis"},
-    {"@0800020002600402", "Inkling Boy - Purple"},
-    {"@04c7000100940502", "Eunice"},
-    {"@09c90501029a0e02", "Bowser - Horse Racing"},
-    {"@0008000000030002", "Donkey Kong"},
-    {"@0000040004c10102", "Elephant Mario"},
-    {"@000a000303a0ff02", "Toad - Power Up Band"},
-    {"@000a010004c20102", "Captain Toad && Talking Flower"},
-    {"@0025010004c30102", "Poplin && Prince Florian"},
-    {"@03ed000101a30502", "Rory"},
-    {"@029b000100cb0502", "Egbert"},
-    {"@0000000000000002", "Mario"},
-    {"@09cf010102b40e02", "Rosalina - Soccer"},
-    {"@01000000034e0902", "Link - Skyward Sword"},
-    {"@02870001005a0502", "Cheri"},
-    {"@0183020103a80502", "Tom Nook"},
-    {"@09c1050102720e02", "Luigi - Horse Racing"},
-    {"@09c40101027d0e02", "Yoshi - Soccer"},
-    {"@03d2000100e50502", "Mathilda"},
-    {"@09c00301026b0e02", "Mario - Tennis"},
-    {"@08000300036b0402", "Inkling Squid - Neon Purple"},
-    {"@04d2000101a70502", "Pietro"},
-    {"@09cc030102a70e02", "Baby Mario - Tennis"},
-    {"@09c8020102920e02", "Diddy Kong - Baseball"},
-    {"@0310000100f80502", "Drake"},
-    {"@050f000103140502", "Dobie"},
-    {"@0002000000360102", "Peach"},
-    {"@09c70201028d0e02", "Donkey Kong - Baseball"},
-    {"@0a1a000103d10502", "Zoe"},
-    {"@0183000100450502", "Tom Nook"},
-    {"@0357000100eb0502", "Nan"},
-    {"@09c40201027e0e02", "Yoshi - Baseball"},
-    {"@0002000000010002", "Peach"},
-    {"@0002000404411c02", "Peach - My Mario Wooden Blocks"},
-    {"@0014000002670102", "Waluigi"},
-    {"@0182000103b20502", "K.K. Slider"},
-    {"@03a50001015b0502", "Victoria"},
-    {"@026b000100e90502", "Kitty"},
-    {"@0415000101bb0502", "Rizzo"},
-    {"@09c8040102940e02", "Diddy Kong - Golf"},
-    {"@04e2000101090502", "Agent S"},
-    {"@1b92000000250002", "Greninja"},
-    {"@09c2020102740e02", "Peach - Baseball"},
-    {"@043f000101550502", "Flora"},
-    {"@04a6000100a30502", "Cole"},
-    {"@0429000100700502", "Octavian"},
-    {"@0023000003680102", "Koopa Troopa"},
-    {"@0463000101310502", "Friga"},
-    {"@0342000101280502", "Cousteau"},
-    {"@018f010101190502", "Don Resetti - Without Hat"},
-    {"@0a13000103ca0502", "Tiansheng"},
-    {"@02a2000101ba0502", "Becky"},
-    {"@0222000101440502", "Klaus"},
-    {"@041e0001015f0502", "Chadder"},
-    {"@0800010003690402", "Inkling Girl - Neon Pink"},
-    {"@0015000003670102", "Goomba"},
-    {"@3240010003640002", "Bayonetta - Player 2"},
-    {"@00000000003c0102", "Mario - Gold Edition"},
-    {"@05c00100001d0002", "Zero Suit Samus"},
-    {"@00000003039bff02", "Mario - Power Up Band"},
-    {"@0740000000100002", "Pit"},
-    {"@0495000101920502", "Dotty"},
-    {"@01b6000100ae0502", "Katie"},
-    {"@0101010000170002", "Sheik"},
-    {"@09d1050102c20e02", "Pink Gold Peach - Horse Racing"},
-    {"@01af0001011c0502", "Jingle"},
-    {"@026f000101900502", "Lolly"},
-    {"@08000100025f0402", "Inkling Girl - Lime Green"},
-    {"@09d0050102bd0e02", "Metal Mario - Horse Racing"},
-    {"@08050200041b0402", "Octoling - Blue"},
-    {"@2106000003601202", "Alm"},
-    {"@37c10000038c0002", "Richter"},
-    {"@033f0001008f0502", "Jeremiah"},
-    {"@09c9040102990e02", "Bowser - Golf"},
-    {"@019e000100ad0502", "Booker"},
-    {"@02ec000101c40502", "Lucky"},
-    {"@0182000002400502", "K. K. Slider"},
-    {"@01b5000100510502", "Luna"},
-    {"@049e000101b70502", "Doc"},
-    {"@0454000101ae0502", "Celia"},
-    {"@0399000101c20502", "Hippeux"},
-    {"@09cd010102aa0e02", "Baby Luigi - Soccer"},
-    {"@04ec000100770502", "Poppy"},
-    {"@04b2000101b90502", "Tank"},
-    {"@01c1020103bb0502", "Lottie - Island"},
-    {"@02f9000101020502", "Marcel"},
-    {"@018a000100a90502", "Reese"},
-    {"@06420000035f1102", "Pikmin"},
-    {"@03a40001014f0502", "Buck"},
-    {"@04e7000101320502", "Ricky"},
-    {"@0461000101610502", "Cube"},
-    {"@3840000104241902", "Yuga Ohdo"},
-    {"@09ce010102af0e02", "Birdo - Soccer"},
-    {"@09c30301027a0e02", "Daisy - Tennis"},
-    {"@03d6000101570502", "Astrid"},
-    {"@01810100023f0502", "Isabelle - Winter Outfit"},
-    {"@0193000002480502", "Celeste"},
-    {"@0003010200420302", "Pink Yarn Yoshi"},
-    {"@3804000103971702", "Ganda"},
-    {"@09c3020102790e02", "Daisy - Baseball"},
-    {"@09c9030102980e02", "Bowser - Tennis"},
-    {"@0469000101640502", "Boomer"},
-    {"@0009000002650102", "Diddy Kong"},
-    {"@000900030432ff02", "Diddy Kong - Power Up Band"},
-    {"@03c40001012b0502", "Canberra"},
-    {"@09d1040102c10e02", "Pink Gold Peach - Golf"},
-    {"@050b000100990502", "Chief"},
-    {"@08000200036a0402", "Inkling Boy - Neon Green"},
-    {"@0394000100890502", "Biff"},
-    {"@06c00000000f0002", "Little Mac"},
-    {"@03b1000100f00502", "Julian"},
-    {"@0265000101540502", "Moe"},
-    {"@09cc020102a60e02", "Baby Mario - Baseball"},
-    {"@01a1000101100502", "Phyllis"},
-    {"@0a0a000103c10502", "Megan"},
-    {"@0003010200410302", "Green Yarn Yoshi"},
-    {"@02f3000102f90502", "Maddie"},
-    {"@04ce000100db0502", "Wendy"},
-    {"@04dd000100a20502", "Peanut"},
-    {"@0a19000103d00502", "Chabwick"},
-    {"@0198000100b10502", "Leila"},
-    {"@22410000041e0002", "Pyra"},
-    {"@0374010103190502", "Rilla"},
-    {"@0180000000080002", "Villager"},
-    {"@0188000103af0502", "Mabel"},
-    {"@049b000100610502", "Tiffany"},
-    {"@09ca0401029e0e02", "Bowser Jr. - Golf"},
-    {"@1f03000002570c02", "Waddle Dee"},
-    {"@02c7000101220502", "Del"},
-    {"@02f2000100cc0502", "Cookie"},
-    {"@09c70301028e0e02", "Donkey Kong - Tennis"},
-    {"@01810000037d0002", "Isabelle"},
-    {"@34c0000002530002", "Ryu"},
-    {"@34c2000004aa1d02", "Luke"},
-    {"@34c2000104ab1d02", "Luke"},
-    {"@34c3000004ac1d02", "Jamie"},
-    {"@34c3000104ad1d02", "Jamie"},
-    {"@34cc000104b71d02", "Manon"},
-    {"@34c4000004ae1d02", "Kimberly"},
-    {"@34c4000104af1d02", "Kimberly"},
-    {"@34cd000104b81d02", "Marisa"},
-    {"@34d0000104bb1d02", "Lily"},
-    {"@34ce000104b91d02", "JP"},
-    {"@34c7000104b21d02", "Juri"},
-    {"@34cb000104b61d02", "Dee Jay"},
-    {"@34d1000104bc1d02", "Cammy"},
-    {"@34c0000104a81d02", "Ryu"},
-    {"@34ca000104b51d02", "E. Honda"},
-    {"@34c8000104b31d02", "Blanka"},
-    {"@34c6000104b11d02", "Guile"},
-    {"@34c1000104a91d02", "Ken"},
-    {"@34c5000104b01d02", "Chun-Li"},
-    {"@34cf000104ba1d02", "Zangief"},
-    {"@34c9000104b41d02", "Dhalsim"},
-    {"@34d2000104bd1d02", "Rashid"},
-    {"@34d3000104be1d02", "A.K.I"},
-    {"@34d4000104bf1d02", "Ed"},
-    {"@34d5000104c01d02", "Akuma"},
-    {"@34d6000104e11d02", "M. Bison"},
-    {"@3c80000104e81d02", "Terry"},
-    {"@3c81000104f21d02", "Mai"},
-    {"@34d8000104e31d02", "Elena"},
-    {"@34d9000104e41d02", "Sagat"},
-    {"@34da000104e51d02", "C. Viper"},
-    {"@34db000104e61d02", "Alex"},
-    {"@34dc000104e71d02", "Ingrid"},
-    {"@34c2000104cd1d02", "Luke"},
-    {"@34c3000104ce1d02", "Jamie"},
-    {"@34cc000104d71d02", "Manon"},
-    {"@34c4000104cf1d02", "Kimberly"},
-    {"@34cd000104d81d02", "Marisa"},
-    {"@34d0000104db1d02", "Lily"},
-    {"@34ce000104d91d02", "JP"},
-    {"@34c7000104d21d02", "Juri"},
-    {"@34cb000104d61d02", "Dee Jay"},
-    {"@34d1000104dc1d02", "Cammy"},
-    {"@34c0000104cb1d02", "Ryu"},
-    {"@34ca000104d51d02", "E. Honda"},
-    {"@34c8000104d31d02", "Blanka"},
-    {"@34c6000104d11d02", "Guile"},
-    {"@34c1000104cc1d02", "Ken"},
-    {"@34c5000104d01d02", "Chun-Li"},
-    {"@34cf000104da1d02", "Zangief"},
-    {"@34c9000104d41d02", "Dhalsim"},
-    {"@34d2000104dd1d02", "Rashid"},
-    {"@34d3000104de1d02", "A.K.I"},
-    {"@34d4000104df1d02", "Ed"},
-    {"@34d5000104e01d02", "Akuma"},
-    {"@34d6000104eb1d02", "M. Bison"},
-    {"@3c80000104f11d02", "Terry"},
-    {"@3c81000104f31d02", "Mai"},
-    {"@34d8000104ec1d02", "Elena"},
-    {"@34d9000104ed1d02", "Sagat"},
-    {"@34da000104ee1d02", "C. Viper"},
-    {"@34db000104ef1d02", "Alex"},
-    {"@34dc000104f01d02", "Ingrid"},
-    {"@0398000100bf0502", "Harry"},
-    {"@0401000100660502", "Deli"},
-    {"@02e00101031d0502", "Chelsea"},
-    {"@01020100001b0002", "Ganondorf"},
-    {"@09c30401027b0e02", "Daisy - Golf"},
-    {"@09d1030102c00e02", "Pink Gold Peach - Tennis"},
-    {"@03e6000100ec0502", "Bud"},
-    {"@3a00000003a10002", "Joker"},
-    {"@03710001005c0502", "Al"},
-    {"@03fe000101a40502", "Elise"},
-    {"@05c3000003800002", "Dark Samus"},
-    {"@03db0001006d0502", "Marcie"},
-    {"@0216000100570502", "Curt"},
-    {"@05150001005b0502", "Kyle"},
-    {"@2105010003630002", "Corrin - Player 2"},
-    {"@024a000101d10502", "Angus"},
-    {"@0478000101630502", "Curly"},
-    {"@00030003039fff02", "Yoshi - Power Up Band"},
-    {"@09c00401026c0e02", "Mario - Golf"},
-    {"@09cd040102ad0e02", "Baby Luigi - Golf"},
-    {"@09c5050102860e02", "Wario - Horse Racing"},
-    {"@09ca0201029c0e02", "Bowser Jr. - Baseball"},
-    {"@01810201011a0502", "Isabelle - Kimono"},
-    {"@033c000101000502", "Drift"},
-    {"@0327000101c30502", "Margie"},
-    {"@030d000101840502", "Mallary"},
-    {"@09c9020102970e02", "Bowser - Baseball"},
-    {"@1f02000002560c02", "King Dedede"},
-    {"@09c10201026f0e02", "Luigi - Baseball"},
-    {"@07820000002f0002", "Duck Hunt"},
-    {"@03ab000103160502", "Cleo"},
-    {"@018c010101180502", "Digby - Raincoat"},
-    {"@09cf050102b80e02", "Rosalina - Horse Racing"},
-    {"@0a0d000103c40502", "Cyd"},
-    {"@0005000000390102", "Bowser"},
-    {"@0a20000103d70502", "Faith"},
-    {"@03ad000101b20502", "Annalise"},
-    {"@00000000003d0102", "Mario - Silver Edition"},
-    {"@1bd7000003860002", "Incineroar"},
-    {"@09c4050102810e02", "Yoshi - Horse Racing"},
-    {"@02c9000100cd0502", "Sly"},
-    {"@0299000100950502", "Goose"},
-    {"@0804000003770402", "Marina"},
-    {"@0804000004390402", "Marina - Side Order"},
-    {"@32400000025b0002", "Bayonetta"},
-    {"@03080001014d0502", "Joey"},
-    {"@1d40000003870002", "Pokemon Trainer"},
-    {"@0262000101370502", "Tangy"},
-    {"@0488000100980502", "Pancetti"},
-    {"@05c20000037f0002", "Ridley"},
-    {"@09c70401028f0e02", "Donkey Kong - Golf"},
-    {"@036d000103040502", "Louie"},
-    {"@040c000101590502", "Dora"},
-    {"@02a50001018c0502", "Broffina"},
-    {"@043e000101490502", "Blanche"},
-    {"@09c00501026d0e02", "Mario - Horse Racing"},
-    {"@03ee0001008b0502", "Lionel"},
-    {"@023d000101b50502", "Jacques"},
-    {"@04c5000101010502", "Vesta"},
-    {"@0356000101350502", "Chevre"},
-    {"@02fc0001018f0502", "Shep"},
-    {"@35c20000036d0a02", "Specter Knight"},
-    {"@0511000101950502", "Fang"},
-    {"@0181050103bf0502", "Isabelle - Sweater"},
-    {"@04970001007a0502", "Snake"},
-    {"@0a1c000103d30502", "Rio"},
-    {"@028b000100e30502", "Pekoe"},
-    {"@0193000101740502", "Celeste"},
-    {"@02b70001030f0502", "Norma"},
-    {"@02eb000100de0502", "Butch"},
-    {"@04ee0001014b0502", "Marshal"},
-    {"@0805030003900402", "Octoling Octopus"},
-    {"@0000000002380602", "8-Bit Mario Classic Color"},
-    {"@0000050004e90102", "Mario and Luma"},
-    {"@0260000100d20502", "Olivia"},
-    {"@01010000000e0002", "Zelda"},
-    {"@05c0000003651302", "Samus Aran"},
-    {"@02d8000100e20502", "Zell"},
-    {"@03830001009b0502", "Clay"},
-    {"@09cb030102a20e02", "Boo - Tennis"},
-    {"@02ea000101800502", "Goldie"},
-    {"@3802000103951702", "Yabe"},
-    {"@22800000002c0002", "Ness"},
-    {"@35c10000036c0a02", "Plague Knight"},
-    {"@03410001030e0502", "Tad"},
-    {"@041d0001018a0502", "Penelope"},
-    {"@09cf040102b70e02", "Rosalina - Golf"},
-    {"@07420000001f0002", "Palutena"},
-    {"@04cd000101520502", "Curlos"},
-    {"@04100001007f0502", "Samson"},
-    {"@01a6000100500502", "Saharah"},
-    {"@03d9000101a50502", "Walt"},
-    {"@043b000103030502", "Julia"},
-    {"@037e000101560502", "Hamlet"},
-    {"@0220000100fd0502", "Charlise"},
-    {"@03c0000103100502", "Gonzo"},
-    {"@0323000100760502", "Opal"},
-    {"@046c0001008c0502", "Flo"},
-    {"@02a4000100720502", "Knox"},
-    {"@0008000002640102", "Donkey Kong"},
-    {"@00080100042f1a02", "Donkey Kong && Pauline"},
-    {"@000800030431ff02", "Donkey Kong - Power Up Band"},
-    {"@02fb000100900502", "Cherry"},
-    {"@018d0000024c0502", "Rover"},
-    {"@03820001016b0502", "Soleil"},
-    {"@028d000101bd0502", "Barold"},
-    {"@09ce020102b00e02", "Birdo - Baseball"},
-    {"@000a000000380102", "Toad"},
-    {"@04000001006f0502", "Shari"},
-    {"@01a30001004a0502", "Joan"},
-    {"@09ca0101029b0e02", "Bowser Jr. - Soccer"},
-    {"@04ed000100620502", "Sheldon"},
-    {"@028c0001013e0502", "Chester"},
-    {"@09cd050102ae0e02", "Baby Luigi - Horse Racing"},
-    {"@021f000103170502", "Ike"},
-    {"@0197000101770502", "Leilani"},
-    {"@0514000101530502", "Skye"},
-    {"@0a02000103b30502", "C.J."},
-    {"@09d0020102ba0e02", "Metal Mario - Baseball"},
-    {"@09c00201026a0e02", "Mario - Baseball"},
-    {"@0194000103b60502", "Kicks"},
-    {"@04c8000102ed0502", "Stella"},
-    {"@0510000101070502", "Freya"},
-    {"@0a0e000103c50502", "Judy"},
-    {"@036a0001019d0502", "Peewee"},
-    {"@0183030103be0502", "Tom Nook - Coat"},
-    {"@09c8030102930e02", "Diddy Kong - Tennis"},
-    {"@018f000100b30502", "Don Resetti"},
-    {"@04b9000101600502", "Merengue"},
-    {"@04d10001009e0502", "Muffy"},
-    {"@22430000043d1b02", "Noah"},
-    {"@22440000043e1b02", "Mio"},
-    {"@3f000000042e0002", "Sora"},
-    {"@1f00000004c41e03", "Kirby (&& Warp Star)"},
-    {"@1f03010004c91e03", "Bandana Waddle Dee (&& Winged Star)"}};
+	{"@0438000103000502", "Sandy"},
+	{"@0181010100b40502", "Isabelle - Winter"},
+	{"@3200000000300002", "Sonic"},
+	{"@029e0001013d0502", "Ava"},
+	{"@01b3000100b50502", "Blanca"},
+	{"@02f8000101380502", "Mac"},
+	{"@023c000100bd0502", "Lucha"},
+	{"@0263000100750502", "Punchy"},
+	{"@03700001015d0502", "Violet"},
+	{"@07c0000000210002", "Mii Brawler"},
+	{"@09c5020102830e02", "Wario - Baseball"},
+	{"@026c000100c30502", "Tom"},
+	{"@0101030004140902", "Zelda and Loftwing"},
+	{"@04e6000100820502", "Mint"},
+	{"@04e3000101650502", "Caroline"},
+	{"@0188000101120502", "Mabel"},
+	{"@0800010004150402", "Inkling - Yellow"},
+	{"@0807000004330402", "Shiver"},
+	{"@0808000004340402", "Frye"},
+	{"@0809000004350402", "Big Man"},
+	{"@0a1d000103d40502", "Frett"},
+	{"@035d000100c90502", "Kidd"},
+	{"@1f400000035e1002", "Qbby"},
+	{"@09c6010102870e02", "Waluigi - Soccer"},
+	{"@0264000101ac0502", "Purrl"},
+	{"@025e000101250502", "Mitzi"},
+	{"@0a10000103c70502", "Reneigh"},
+	{"@047a000100600502", "Rasher"},
+	{"@04a10001016f0502", "Chrissy"},
+	{"@09d0030102bb0e02", "Metal Mario - Tennis"},
+	{"@01910001004e0502", "Harriet"},
+	{"@02f1000101450502", "Daisy"},
+	{"@02d7000101300502", "Bam"},
+	{"@02030001019a0502", "Anabelle"},
+	{"@0189000100ab0502", "Labelle"},
+	{"@3841000104251902", "Tatsuhisa “Luke” Kamijō"},
+	{"@08060100041c0402", "Smallfry"},
+	{"@0800010003820002", "Inkling"},
+	{"@018d0001010c0502", "Rover"},
+	{"@01a7000101140502", "Wendell"},
+	{"@04ba0001005d0502", "Renée"},
+	{"@0489000100ef0502", "Agnes"},
+	{"@018e010101780502", "Resetti - Without Hat"},
+	{"@0a04000103b50502", "Daisy Mae"},
+	{"@026d0001013f0502", "Merry"},
+	{"@03250001010a0502", "Big Top"},
+	{"@01b4000101130502", "Leif"},
+	{"@0390000101850502", "Rocco"},
+	{"@09c7050102900e02", "Donkey Kong - Horse Racing"},
+	{"@0437000101050502", "Gladys"},
+	{"@0230000101d20502", "Twiggy"},
+	{"@033b000100fa0502", "Camofrog"},
+	{"@01c1000002440502", "Lottie"},
+	{"@00c00000037b0002", "King K. Rool"},
+	{"@3845000104291902", "Nail Saionji"},
+	{"@3601000004210002", "Sephiroth"},
+	{"@02da000101330502", "Deirdre"},
+	{"@0a03000103b40502", "Flick"},
+	{"@2102000000290002", "Lucina"},
+	{"@02b80001019c0502", "Naomi"},
+	{"@0347000103020502", "Raddle"},
+	{"@01b0000100520502", "Tortimer"},
+	{"@018c000002430502", "Digby"},
+	{"@033e000101a20502", "Puddles"},
+	{"@08050200038f0402", "Octoling Boy"},
+	{"@0140000003550902", "Guardian"},
+	{"@1907000003840002", "Squirtle"},
+	{"@00020003039dff02", "Peach - Power Up Band"},
+	{"@0238000102f80502", "Jacob"},
+	{"@0017000002680102", "Boo"},
+	{"@035e0001018e0502", "Pashmina"},
+	{"@0328000102eb0502", "Paolo"},
+	{"@028a000102e90502", "June"},
+	{"@3740000103741402", "Super Mario Cereal"},
+	{"@0100000000040002", "Link"},
+	{"@3600000002590002", "Cloud"},
+	{"@02710001019b0502", "Rudy"},
+	{"@0384000100860502", "Flurry"},
+	{"@028e0001019e0502", "Tammy"},
+	{"@0214000100e40502", "Teddy"},
+	{"@04510001015e0502", "Frank"},
+	{"@09c2050102770e02", "Peach - Horse Racing"},
+	{"@024d000102f60502", "Stu"},
+	{"@03a8000100910502", "Roscoe"},
+	{"@2101000000180002", "Ike"},
+	{"@09c1040102710e02", "Luigi - Golf"},
+	{"@0381000100d50502", "Rodney"},
+	{"@09cc010102a50e02", "Baby Mario - Soccer"},
+	{"@3805000103981702", "Daijobu"},
+	{"@02d9000101c80502", "Bruce"},
+	{"@040f000101500502", "Bree"},
+	{"@04fd0001007b0502", "Bangle"},
+	{"@0282000101810502", "Stitches"},
+	{"@045f000101a80502", "Aurora"},
+	{"@046a000101d00502", "Iggly"},
+	{"@0252000100fe0502", "Vic"},
+	{"@35050000040c0f02", "Razewing Ratha"},
+	{"@35060000040d0f02", "Ena"},
+	{"@3509000004101802", "Palico"},
+	{"@35090100042b1802", "Palico"},
+	{"@350b0000042d1802", "Malzeno"},
+	{"@350c000004fa0f02", "Ratha"},
+	{"@350d000004fb0f02", "Ratha V"},
+	{"@350e000004fc0f02", "Rudy"},
+	{"@3580000005062102", "Diana"},
+	{"@000000030430ff02", "Golden - Power Up Band"},
+	{"@044c0001008e0502", "Amelia"},
+	{"@0313000101210502", "Miranda"},
+	{"@01a5000101720502", "Katrina"},
+	{"@0a0c000103c30502", "Audie"},
+	{"@09c8050102950e02", "Diddy Kong - Horse Racing"},
+	{"@0307000100640502", "Bill"},
+	{"@022f0001011e0502", "Anchovy"},
+	{"@0a05000103b80502", "Harvey"},
+	{"@0100000003530902", "Link - Archer"},
+	{"@0186010100af0502", "Tommy - Uniform"},
+	{"@08050100038e0402", "Octoling Girl"},
+	{"@01000000034f0902", "8-Bit Link"},
+	{"@0482000102fd0502", "Maggie"},
+	{"@3480000003791502", "Mega Man"},
+	{"@0a00000103ab0502", "Orville"},
+	{"@032e0101031c0502", "Chai"},
+	{"@0a0b000103c20502", "Dom"},
+	{"@01960000024e0502", "Kapp'n"},
+	{"@040d000100780502", "Limberg"},
+	{"@0312000103090502", "Weber"},
+	{"@04940001009a0502", "Bunnie"},
+	{"@00800102035d0302", "Poochy"},
+	{"@09c6030102890e02", "Waluigi - Tennis"},
+	{"@01a00001010f0502", "Pelly"},
+	{"@033a000101cc0502", "Frobert"},
+	{"@09ce050102b30e02", "Birdo - Horse Racing"},
+	{"@04ea000103180502", "Tasha"},
+	{"@022e000101d30502", "Robin"},
+	{"@02c3000100dc0502", "Alfonso"},
+	{"@023e000100d10502", "Peck"},
+	{"@09cd020102ab0e02", "Baby Luigi - Baseball"},
+	{"@0004000002620102", "Rosalina"},
+	{"@0004010004ea0102", "Rosalina and Lumas"},
+	{"@018b000002460502", "Cyrus"},
+	{"@04d0000101960502", "Frita"},
+	{"@046d000100f30502", "Sprinkle"},
+	{"@040e000100880502", "Bella"},
+	{"@02cb000101360502", "Drago"},
+	{"@0199000101160502", "Grams"},
+	{"@21050000025a0002", "Corrin"},
+	{"@04a3000101c90502", "OHare"},
+	{"@0741000000200002", "Dark Pit"},
+	{"@0004010000130002", "Rosalina && Luma"},
+	{"@01a80001004f0502", "Redd"},
+	{"@0188000002410502", "Mabel"},
+	{"@0385000101060502", "Hamphrey"},
+	{"@01ab0001017c0502", "Pave"},
+	{"@09c5010102820e02", "Wario - Soccer"},
+	{"@02c4000100670502", "Alli"},
+	{"@09c4040102800e02", "Yoshi - Golf"},
+	{"@02ee000101990502", "Bones"},
+	{"@05c4000004131302", "E.M.M.I."},
+	{"@0100000003540902", "Link - Rider"},
+	{"@04980001014a0502", "Gaston"},
+	{"@03180001006c0502", "Quillson"},
+	{"@09d1010102be0e02", "Pink Gold Peach - Soccer"},
+	{"@0700000000070002", "Wii Fit Trainer"},
+	{"@00070000001a0002", "Wario"},
+	{"@22c00000003a0202", "Chibi Robo"},
+	{"@00090000000d0002", "Diddy Kong"},
+	{"@01ac0001017f0502", "Zipper"},
+	{"@044d000101930502", "Pierce"},
+	{"@3801000103941702", "Ikari"},
+	{"@0100010003500902", "Toon Link - The Wind Waker"},
+	{"@3640000003a20002", "Hero"},
+	{"@0196000100480502", "Kapp'n"},
+	{"@00010003039cff02", "Luigi - Power Up Band"},
+	{"@08000100003e0402", "Inkling Girl"},
+	{"@050c000101c10502", "Lobo"},
+	{"@0101000003560902", "Zelda"},
+	{"@3502010002e40f02", "Rathian and Cheval"},
+	{"@09c60501028b0e02", "Waluigi - Horse Racing"},
+	{"@0a18000103cf0502", "Quinn"},
+	{"@018c0001004c0502", "Digby"},
+	{"@01000000037c0002", "Young Link"},
+	{"@0343000102ef0502", "Huck"},
+	{"@0450000100cf0502", "Avery"},
+	{"@03d3000102f30502", "Carrie"},
+	{"@0261000100650502", "Kiki"},
+	{"@01810000024b0502", "Isabelle - Summer Outfit"},
+	{"@03da000101510502", "Rooney"},
+	{"@02190001007e0502", "Nate"},
+	{"@09d0010102b90e02", "Metal Mario - Soccer"},
+	{"@049a0001014e0502", "Pippy"},
+	{"@0003000000020002", "Yoshi"},
+	{"@09ce030102b10e02", "Birdo - Tennis"},
+	{"@22420000041f0002", "Mythra"},
+	{"@03720001010b0502", "Rocket"},
+	{"@03ac000101880502", "Peaches"},
+	{"@02a6000101240502", "Ken"},
+	{"@08000200003f0402", "Inkling Boy"},
+	{"@0001000000350102", "Luigi"},
+	{"@019a000100b70502", "Chip"},
+	{"@04ff000101620502", "Claudia"},
+	{"@041c000101410502", "Greta"},
+	{"@2107000003611202", "Celica"},
+	{"@030b000100790502", "Deena"},
+	{"@1902000003830002", "Ivysaur"},
+	{"@04df000100e80502", "Filbert"},
+	{"@035c000101290502", "Velma"},
+	{"@02210001013c0502", "Beardo"},
+	{"@0a1e000103d50502", "Azalea"},
+	{"@05c0000000060002", "Samus"},
+	{"@05c00000043b1302", "Samus"},
+	{"@05c00000043a1302", "Samus && Vi-O-La"},
+	{"@05c50000043c1302", "Sylux"},
+	{"@37c00000038b0002", "Simon"},
+	{"@35080000040f1802", "Magnamalo"},
+	{"@09cf030102b60e02", "Rosalina - Tennis"},
+	{"@09cb040102a30e02", "Boo - Golf"},
+	{"@03ff000100f40502", "Flip"},
+	{"@04ef0001013b0502", "Hazel"},
+	{"@0392000101270502", "Bubbles"},
+	{"@03a7000101a10502", "Elmer"},
+	{"@02c5000103080502", "Boots"},
+	{"@0005ff00023a0702", "Hammer Slam Bowser"},
+	{"@02f4000103050502", "Bea"},
+	{"@036b0001018b0502", "Boone"},
+	{"@0a08000103bd0502", "Wardell"},
+	{"@0a16000103cd0502", "Petri"},
+	{"@0a1b000103d20502", "Ace"},
+	{"@07c0010000220002", "Mii Swordfighter"},
+	{"@3842000104261902", "Gakuto Sōgetsu"},
+	{"@3c80000003a40002", "Terry Bogard"},
+	{"@09c30501027c0e02", "Daisy - Horse Racing"},
+	{"@37800000038a0002", "Snake"},
+	{"@01ae0001011b0502", "Franklin"},
+	{"@1d01000003750d02", "Detective Pikachu"},
+	{"@0462000100f60502", "Hopper"},
+	{"@350a0100042c1802", "Palamute"},
+	{"@03af0001012c0502", "Colton"},
+	{"@0440000100ca0502", "Phoebe"},
+	{"@021c000102f70502", "Ursala"},
+	{"@02ca000101ca0502", "Gayle"},
+	{"@00130000037a0002", "Daisy"},
+	{"@047c000101a00502", "Lucy"},
+	{"@04eb000102f00502", "Sylvana"},
+	{"@0358000102fa0502", "Billy"},
+	{"@021b000100800502", "Tutu"},
+	{"@0a07000103bc0502", "Niko"},
+	{"@021d000101cd0502", "Grizzly"},
+	{"@0181000100440502", "Isabelle"},
+	{"@04a2000102e80502", "Hopkins"},
+	{"@0311000100d60502", "Scoot"},
+	{"@03bf000101bc0502", "Sydney"},
+	{"@04140001030a0502", "Candi"},
+	{"@04d30101031b0502", "Étoile"},
+	{"@03290001009d0502", "Axel"},
+	{"@04fb000101c60502", "Rowan"},
+	{"@025f000101d70502", "Rosie - Amiibo Festival"},
+	{"@01940000024a0502", "Kicks"},
+	{"@3500020002e20f02", "One-Eyed Rathalos and Rider - Female"},
+	{"@019d000100ac0502", "Copper"},
+	{"@0233000103060502", "Admiral"},
+	{"@043c000101cb0502", "Cranston"},
+	{"@05840000037e0002", "Wolf"},
+	{"@037f000101aa0502", "Apple"},
+	{"@018e000002490502", "Resetti"},
+	{"@09c3010102780e02", "Daisy - Soccer"},
+	{"@1919000000090002", "Pikachu"},
+	{"@03fd000101580502", "Monty"},
+	{"@0206000103120502", "Snooty"},
+	{"@00030102023e0302", "Mega Yarn Yoshi"},
+	{"@02a3000102ff0502", "Plucky"},
+	{"@049c000101400502", "Genji"},
+	{"@01850001004b0502", "Timmy"},
+	{"@0314000102f40502", "Ketchup"},
+	{"@01030000024f0902", "Midna && Wolf Link"},
+	{"@00010000000c0002", "Luigi"},
+	{"@0001000404401c02", "Luigi - My Mario Wooden Blocks"},
+	{"@0189010103b10502", "Label"},
+	{"@3dc0000004220002", "Steve"},
+	{"@01840000024d0502", "Timmy && Tommy"},
+	{"@21000000000b0002", "Marth"},
+	{"@0195000100b00502", "Porter"},
+	{"@0003000000370102", "Yoshi"},
+	{"@0003000404421c02", "Yoshi - My Mario Wooden Blocks"},
+	{"@030f0001016d0502", "Derwin"},
+	{"@07810000002e0002", "R.O.B. - Famicom"},
+	{"@3600010003620002", "Cloud - Player 2"},
+	{"@02090001019f0502", "Olaf"},
+	{"@04b3000100dd0502", "Rhonda"},
+	{"@09c60401028a0e02", "Waluigi - Golf"},
+	{"@21080000036f1202", "Chrom"},
+	{"@09ce040102b20e02", "Birdo - Golf"},
+	{"@09c5040102850e02", "Wario - Golf"},
+	{"@0369000100d30502", "Cesar"},
+	{"@3380000003781402", "Solaire of Astora"},
+	{"@3844000104281902", "Roa Kirishima"},
+	{"@0215000101820502", "Pinky"},
+	{"@0286000103130502", "Olive"},
+	{"@078f000003810002", "Ice Climbers"},
+	{"@38460001042a1902", "Asana Mutsuba"},
+	{"@01830101010e0502", "Tom Nook - Jacket"},
+	{"@0416000100fb0502", "Anicotti"},
+	{"@09c0010102690e02", "Mario - Soccer"},
+	{"@03490001018d0502", "Croque"},
+	{"@0105000003580902", "Daruk"},
+	{"@010b000004a50902", "Tulin"},
+	{"@010c000004a60902", "Yunobo"},
+	{"@010a000004a40902", "Sidon"},
+	{"@0109000004a30902", "Riju"},
+	{"@0486000100fc0502", "Chops"},
+	{"@35c0000003920a02", "Shovel Knight - Gold Edition"},
+	{"@0005000003730102", "Bowser - Wedding"},
+	{"@0182010100460502", "DJ KK"},
+	{"@01a6000103b70502", "Saharah"},
+	{"@02310001006a0502", "Jitters"},
+	{"@01070000035a0902", "Mipha"},
+	{"@35070000040e0f02", "Tsukino"},
+	{"@0251000100c10502", "Coach"},
+	{"@02df000101910502", "Erik"},
+	{"@03fc000101470502", "Tammi"},
+	{"@03480001006b0502", "Gigi"},
+	{"@02ed0001015a0502", "Biskit"},
+	{"@34c1000003890002", "Ken"},
+	{"@0187000100470502", "Sable"},
+	{"@0190000101710502", "Brewster"},
+	{"@03c50001015c0502", "Lyman"},
+	{"@0200000100a10502", "Cyrano"},
+	{"@0418000100d80502", "Broccolo"},
+	{"@03a9000100710502", "Winnie"},
+	{"@0235000100840502", "Midge"},
+	{"@04e8000101ce0502", "Cally"},
+	{"@3504010002e60f02", "Qurupeco and Dan"},
+	{"@0283000100c70502", "Vladimir"},
+	{"@03ea0001030b0502", "Leopold"},
+	{"@030a000101c70502", "Maelle"},
+	{"@08010000025d0402", "Callie"},
+	{"@0801000004360402", "Callie - Alterna"},
+	{"@04a80101031e0502", "Toby"},
+	{"@0496000100d90502", "Coco"},
+	{"@0439000103110502", "Sprocket"},
+	{"@01ad000100b80502", "Jack"},
+	{"@3800000103931702", "Pawapuro"},
+	{"@3b40000003a30002", "Banjo && Kazooie"},
+	{"@03d7000101b40502", "Sylvia"},
+	{"@050e000100d70502", "Whitney"},
+	{"@01a80101017e0502", "Redd - Shirt"},
+	{"@0a400000041d0002", "Min Min"},
+	{"@09c2010102730e02", "Peach - Soccer"},
+	{"@0a09000103c00502", "Sherb"},
+	{"@026a000101460502", "Stinky"},
+	{"@04a00001016e0502", "Francine"},
+	{"@0460000100a50502", "Roald"},
+	{"@09cb050102a40e02", "Boo - Horse Racing"},
+	{"@02680001007d0502", "Monique"},
+	{"@04fc000102ee0502", "Tybalt"},
+	{"@03be000101980502", "Melba"},
+	{"@09c10101026e0e02", "Luigi - Soccer"},
+	{"@2108000003880002", "Chrom"},
+	{"@1f01000000270002", "Meta Knight"},
+	{"@1f01000004c61e03", "Meta Knight (&& Shadow Star)"},
+	{"@04e1000101be0502", "Nibbles"},
+	{"@08020000025e0402", "Marie"},
+	{"@0802000004370402", "Marie - Alterna"},
+	{"@028f0101031a0502", "Marty"},
+	{"@047d0001012e0502", "Spork - Crackle"},
+	{"@09cb010102a00e02", "Boo - Soccer"},
+	{"@35c30000036e0a02", "King Knight"},
+	{"@0800030000400402", "Inkling Squid"},
+	{"@034b0001009f0502", "Henry"},
+	{"@0192000002470502", "Blathers"},
+	{"@01080000035b0902", "Revali"},
+	{"@04cf000100e10502", "Timbra"},
+	{"@03aa000100e60502", "Ed"},
+	{"@0187000103b00502", "Sable"},
+	{"@0453000101040502", "Keaton"},
+	{"@047b000100f50502", "Hugh"},
+	{"@033d0001013a0502", "Wart Jr."},
+	{"@0194000100aa0502", "Kicks"},
+	{"@01b1000100b20502", "Shrunk"},
+	{"@03c6000100930502", "Eugene"},
+	{"@04e0000100f70502", "Pecan"},
+	{"@1ac0000000110002", "Lucario"},
+	{"@023f000101660502", "Sparro"},
+	{"@0101000003520902", "Toon Zelda - The Wind Waker"},
+	{"@0181030101700502", "Isabelle - Dress"},
+	{"@0266000100680502", "Kabuki"},
+	{"@0326000101390502", "Eloise"},
+	{"@04850001014c0502", "Gala"},
+	{"@046b000101970502", "Tex"},
+	{"@018a000002450502", "Reese"},
+	{"@0500000100e70502", "Bianca"},
+	{"@0000000000340102", "Mario"},
+	{"@00000004043f1c02", "Mario - My Mario Wooden Blocks"},
+	{"@07c0020000230002", "Mii Gunner"},
+	{"@0002000003720102", "Peach - Wedding"},
+	{"@0a17000103ce0502", "Cephalobot"},
+	{"@0464000100c00502", "Gwen"},
+	{"@09c70101028c0e02", "Donkey Kong - Soccer"},
+	{"@0487000101bf0502", "Kevin"},
+	{"@04de000100ce0502", "Blaire"},
+	{"@050d000101420502", "Wolfgang"},
+	{"@09c40301027f0e02", "Yoshi - Tennis"},
+	{"@018e000100490502", "Resetti"},
+	{"@0483000101b00502", "Peggy"},
+	{"@01000000034d0902", "Link - Twilight Princess"},
+	{"@036e000102fb0502", "Boyd"},
+	{"@3500010002e10f02", "One-Eyed Rathalos and Rider - Male"},
+	{"@0499000100df0502", "Gabi"},
+	{"@024f000100810502", "T-Bone"},
+	{"@09c5030102840e02", "Wario - Tennis"},
+	{"@0580000000050002", "Fox"},
+	{"@0800030002610402", "Inkling Squid - Orange"},
+	{"@01020100041a0902", "Ganondorf - Tears of the Kingdom"},
+	{"@0481000102f10502", "Boris"},
+	{"@02010001016a0502", "Antonio"},
+	{"@0284000102fe0502", "Murphy"},
+	{"@0468000102f20502", "Wade"},
+	{"@0282000101d60502", "Stitches - Amiibo Festival"},
+	{"@01a40001004d0502", "Pascal"},
+	{"@0a06000103ba0502", "Wisp"},
+	{"@02dc000100be0502", "Fuchsia"},
+	{"@1927000000260002", "Jigglypuff"},
+	{"@032c000101480502", "Tucker"},
+	{"@01000000034b0902", "Link - Ocarina of Time"},
+	{"@09cb020102a10e02", "Boo - Baseball"},
+	{"@09c2040102760e02", "Peach - Golf"},
+	{"@03e70001012a0502", "Elvis"},
+	{"@19ac000003850002", "Pichu"},
+	{"@0803000003760402", "Pearl"},
+	{"@0803000004380402", "Pearl - Side Order"},
+	{"@0a14000103cb0502", "Shino"},
+	{"@01000000034c0902", "Link - Majora's Mask"},
+	{"@01c10101017a0502", "Lottie - Black Skirt And Bow"},
+	{"@0513000102e70502", "Vivian"},
+	{"@041b000100f10502", "Bettina"},
+	{"@3dc1000004230002", "Alex"},
+	{"@01aa000100530502", "Lyle"},
+	{"@02f0000100a70502", "Walker"},
+	{"@03c1000100bb0502", "Ozzie"},
+	{"@0008ff00023b0702", "Turbo Charge Donkey Kong"},
+	{"@0452000100730502", "Sterling"},
+	{"@0181000101d40502", "Isabelle - Character Parfait"},
+	{"@049f000103010502", "Claude"},
+	{"@02ea000101d50502", "Goldie - Amiibo Festival"},
+	{"@02d6000100560502", "Fauna"},
+	{"@0270000100ff0502", "Ankha"},
+	{"@01a2000103b90502", "Gulliver"},
+	{"@0267000101080502", "Kid Cat"},
+	{"@3843000104271902", "Romin Kirishima"},
+	{"@0272000101860502", "Katt"},
+	{"@00240000038d0002", "Piranha Plant"},
+	{"@03e8000102f50502", "Rex"},
+	{"@02dd000100ea0502", "Beau"},
+	{"@01410000035c0902", "Bokoblin"},
+	{"@09cf020102b50e02", "Rosalina - Baseball"},
+	{"@19960000023d0002", "Mewtwo"},
+	{"@0393000100a00502", "Bertha"},
+	{"@1d000001025c0d02", "Shadow Mewtwo"},
+	{"@04650001006e0502", "Puck"},
+	{"@0106000003590902", "Urbosa"},
+	{"@025f000101c50502", "Rosie"},
+	{"@210b000003a50002", "Byleth"},
+	{"@04b40001030c0502", "Spike"},
+	{"@0100000003990902", "Link - Link's Awakening"},
+	{"@041a000100e00502", "Moose"},
+	{"@0000000002390602", "8-Bit Mario Modern Color"},
+	{"@04800001008d0502", "Cobb"},
+	{"@09c8010102910e02", "Diddy Kong - Soccer"},
+	{"@02ef000100580502", "Portia"},
+	{"@029a000100ee0502", "Benedict"},
+	{"@0280000100830502", "Pudge"},
+	{"@022d000100f20502", "Jay"},
+	{"@35c0000002500a02", "Shovel Knight"},
+	{"@38c0000003911602", "Loot Goblin"},
+	{"@02690001011f0502", "Tabby"},
+	{"@0281000101200502", "Kody"},
+	{"@09ca0501029f0e02", "Bowser Jr. - Horse Racing"},
+	{"@044b0001016c0502", "Apollo"},
+	{"@0184050103a90502", "Timmy && Tommy"},
+	{"@027e000101690502", "Maple"},
+	{"@0000010000190002", "Dr. Mario"},
+	{"@09cc050102a90e02", "Baby Mario - Horse Racing"},
+	{"@09cd030102ac0e02", "Baby Luigi - Tennis"},
+	{"@0208000100960502", "Annalisa"},
+	{"@032d000100bc0502", "Tia"},
+	{"@03bc0001008a0502", "Yuka"},
+	{"@0183000002420502", "Tom Nook"},
+	{"@0309000100c60502", "Pate"},
+	{"@1f000000000a0002", "Kirby"},
+	{"@04a4000100d40502", "Carmen"},
+	{"@019c000101730502", "Phineas"},
+	{"@03380001011d0502", "Lily"},
+	{"@025d000100550502", "Bob"},
+	{"@3501000002e30f02", "Nabiru"},
+	{"@018b000101150502", "Cyrus"},
+	{"@350a000004111802", "Palamute"},
+	{"@0181040103aa0502", "Isabelle"},
+	{"@33c0000004200002", "Kazuya"},
+	{"@05810000001c0002", "Falco"},
+	{"@03a6000100c80502", "Savannah"},
+	{"@2281000002510002", "Lucas"},
+	{"@043d0001007c0502", "Phil"},
+	{"@019f000101110502", "Pete"},
+	{"@0380000101870502", "Graham"},
+	{"@3503010002e50f02", "Barioth and Ayuria"},
+	{"@030e0001012f0502", "Freckles"},
+	{"@0a1f000103d60502", "Roswell"},
+	{"@0005000000140002", "Bowser"},
+	{"@02fa000100970502", "Benjamin"},
+	{"@05c0000004121302", "Samus - Metroid Dread"},
+	{"@02db0001005e0502", "Lopez"},
+	{"@04cc000100a40502", "Willow"},
+	{"@03450001005f0502", "Jambette"},
+	{"@1906000000240002", "Charizard"},
+	{"@04a7000101a60502", "Mira"},
+	{"@0000030003a60102", "Mario - Cat"},
+	{"@01b10101017b0502", "Shrunk - Loud Jacket"},
+	{"@0a0f000103c60502", "Raymond"},
+	{"@0a12000103c90502", "Ione"},
+	{"@0317000100a60502", "Molly"},
+	{"@01a9000101760502", "Gracie"},
+	{"@2109000003701202", "Tiki"},
+	{"@0373000101340502", "Hans"},
+	{"@019b000100b60502", "Nat"},
+	{"@0186030101750502", "Tommy - Suit"},
+	{"@3480000002580002", "Mega Man - Gold Edition"},
+	{"@0185020101170502", "Timmy - Full Apron"},
+	{"@0101000004190902", "Zelda - Tears of the Kingdom"},
+	{"@026e000100ba0502", "Felicity"},
+	{"@01a20001017d0502", "Gulliver"},
+	{"@09c6020102880e02", "Waluigi - Baseball"},
+	{"@01920001010d0502", "Blathers"},
+	{"@1f00000002540c02", "Kirby"},
+	{"@024b000101260502", "Rodeo"},
+	{"@09cc040102a80e02", "Baby Mario - Golf"},
+	{"@03d1000100c20502", "Kitt"},
+	{"@0344000100c50502", "Prince"},
+	{"@0182000101d80502", "K. K. Slider - Pikopuri"},
+	{"@06400100001e0002", "Olimar"},
+	{"@03ae000100870502", "Clyde"},
+	{"@049d000100ed0502", "Ruby"},
+	{"@021a000100da0502", "Groucho"},
+	{"@1f02000000280002", "King Dedede"},
+	{"@2104000002520002", "Roy"},
+	{"@0000000003710102", "Mario - Wedding"},
+	{"@0003010200430302", "Light Blue Yarn Yoshi"},
+	{"@04c6000101670502", "Baabara"},
+	{"@07800000002d0002", "Mr. Game && Watch"},
+	{"@0600000000120002", "Captain Falcon"},
+	{"@04e5000101ad0502", "Static"},
+	{"@0411000101ab0502", "Rod"},
+	{"@0395000102fc0502", "Bitty"},
+	{"@0002010003a70102", "Peach - Cat"},
+	{"@044e000103150502", "Buzz"},
+	{"@0192000103ad0502", "Blathers"},
+	{"@04a5000100740502", "Bonbon"},
+	{"@04fa000101680502", "Rolf"},
+	{"@0436000101940502", "Queenie"},
+	{"@02de0001009c0502", "Diana"},
+	{"@3803000103961702", "Hayakawa"},
+	{"@03bd000100f90502", "Alice"},
+	{"@0007000002630102", "Wario"},
+	{"@021e000101230502", "Paula"},
+	{"@09d0040102bc0e02", "Metal Mario - Golf"},
+	{"@0232000102ea0502", "Piper"},
+	{"@1f01000002550c02", "Meta Knight"},
+	{"@0339000101b10502", "Ribbot"},
+	{"@04b6000102ec0502", "Hornsby"},
+	{"@0185040101790502", "Timmy - Suit"},
+	{"@0a01000103ac0502", "Wilbur"},
+	{"@032a000103070502", "Ellie"},
+	{"@027d000100630502", "Bluebear"},
+	{"@0006000000150002", "Bowser Jr."},
+	{"@22400000002b0002", "Shulk"},
+	{"@0013000002660102", "Daisy"},
+	{"@09c9010102960e02", "Bowser - Soccer"},
+	{"@04e4000101b60502", "Sally"},
+	{"@0a11000103c80502", "Sasha"},
+	{"@21030000002a0002", "Robin"},
+	{"@02b1000100690502", "Patty"},
+	{"@0316000101c00502", "Gloria"},
+	{"@0182000100a80502", "K.K. Slider"},
+	{"@03fb000101cf0502", "Simon"},
+	{"@0100000004180902", "Link - Tears of the Kingdom"},
+	{"@03b0000101a90502", "Papi"},
+	{"@0324000101890502", "Dizzy"},
+	{"@0217000101b30502", "Chow"},
+	{"@02b2000100c40502", "Tipper"},
+	{"@04fe000100590502", "Leonardo"},
+	{"@0100010000160002", "Toon Link"},
+	{"@0202000101030502", "Pango"},
+	{"@0781000000330002", "R.O.B. - NES"},
+	{"@09d1020102bf0e02", "Pink Gold Peach - Baseball"},
+	{"@3340000000320002", "Pac-Man"},
+	{"@0a15000103cc0502", "Marlo"},
+	{"@09c1030102700e02", "Luigi - Tennis"},
+	{"@01c1000100540502", "Lottie"},
+	{"@09c2030102750e02", "Peach - Tennis"},
+	{"@027f000100b90502", "Poncho"},
+	{"@03ec000101830502", "Mott"},
+	{"@042b000101af0502", "Zucker"},
+	{"@00130003039eff02", "Daisy - Power Up Band"},
+	{"@3480000000310002", "Mega Man"},
+	{"@035a000100850502", "Gruff"},
+	{"@05c1000003661302", "Metroid"},
+	{"@030c000101b80502", "Pompom"},
+	{"@0193000103ae0502", "Celeste"},
+	{"@04c90001030d0502", "Cashmere"},
+	{"@034a000101430502", "Diva"},
+	{"@0479000100920502", "Truffles"},
+	{"@042a0001012d0502", "Marina"},
+	{"@03fa000100d00502", "Nana"},
+	{"@09ca0301029d0e02", "Bowser Jr. - Tennis"},
+	{"@0800020002600402", "Inkling Boy - Purple"},
+	{"@04c7000100940502", "Eunice"},
+	{"@09c90501029a0e02", "Bowser - Horse Racing"},
+	{"@0008000000030002", "Donkey Kong"},
+	{"@0000040004c10102", "Elephant Mario"},
+	{"@000a000303a0ff02", "Toad - Power Up Band"},
+	{"@000a010004c20102", "Captain Toad && Talking Flower"},
+	{"@0025010004c30102", "Poplin && Prince Florian"},
+	{"@03ed000101a30502", "Rory"},
+	{"@029b000100cb0502", "Egbert"},
+	{"@0000000000000002", "Mario"},
+	{"@09cf010102b40e02", "Rosalina - Soccer"},
+	{"@01000000034e0902", "Link - Skyward Sword"},
+	{"@02870001005a0502", "Cheri"},
+	{"@0183020103a80502", "Tom Nook"},
+	{"@09c1050102720e02", "Luigi - Horse Racing"},
+	{"@09c40101027d0e02", "Yoshi - Soccer"},
+	{"@03d2000100e50502", "Mathilda"},
+	{"@09c00301026b0e02", "Mario - Tennis"},
+	{"@08000300036b0402", "Inkling Squid - Neon Purple"},
+	{"@04d2000101a70502", "Pietro"},
+	{"@09cc030102a70e02", "Baby Mario - Tennis"},
+	{"@09c8020102920e02", "Diddy Kong - Baseball"},
+	{"@0310000100f80502", "Drake"},
+	{"@050f000103140502", "Dobie"},
+	{"@0002000000360102", "Peach"},
+	{"@09c70201028d0e02", "Donkey Kong - Baseball"},
+	{"@0a1a000103d10502", "Zoe"},
+	{"@0183000100450502", "Tom Nook"},
+	{"@0357000100eb0502", "Nan"},
+	{"@09c40201027e0e02", "Yoshi - Baseball"},
+	{"@0002000000010002", "Peach"},
+	{"@0002000404411c02", "Peach - My Mario Wooden Blocks"},
+	{"@0014000002670102", "Waluigi"},
+	{"@0182000103b20502", "K.K. Slider"},
+	{"@03a50001015b0502", "Victoria"},
+	{"@026b000100e90502", "Kitty"},
+	{"@0415000101bb0502", "Rizzo"},
+	{"@09c8040102940e02", "Diddy Kong - Golf"},
+	{"@04e2000101090502", "Agent S"},
+	{"@1b92000000250002", "Greninja"},
+	{"@09c2020102740e02", "Peach - Baseball"},
+	{"@043f000101550502", "Flora"},
+	{"@04a6000100a30502", "Cole"},
+	{"@0429000100700502", "Octavian"},
+	{"@0023000003680102", "Koopa Troopa"},
+	{"@0463000101310502", "Friga"},
+	{"@0342000101280502", "Cousteau"},
+	{"@018f010101190502", "Don Resetti - Without Hat"},
+	{"@0a13000103ca0502", "Tiansheng"},
+	{"@02a2000101ba0502", "Becky"},
+	{"@0222000101440502", "Klaus"},
+	{"@041e0001015f0502", "Chadder"},
+	{"@0800010003690402", "Inkling Girl - Neon Pink"},
+	{"@0015000003670102", "Goomba"},
+	{"@3240010003640002", "Bayonetta - Player 2"},
+	{"@00000000003c0102", "Mario - Gold Edition"},
+	{"@05c00100001d0002", "Zero Suit Samus"},
+	{"@00000003039bff02", "Mario - Power Up Band"},
+	{"@0740000000100002", "Pit"},
+	{"@0495000101920502", "Dotty"},
+	{"@01b6000100ae0502", "Katie"},
+	{"@0101010000170002", "Sheik"},
+	{"@09d1050102c20e02", "Pink Gold Peach - Horse Racing"},
+	{"@01af0001011c0502", "Jingle"},
+	{"@026f000101900502", "Lolly"},
+	{"@08000100025f0402", "Inkling Girl - Lime Green"},
+	{"@09d0050102bd0e02", "Metal Mario - Horse Racing"},
+	{"@08050200041b0402", "Octoling - Blue"},
+	{"@2106000003601202", "Alm"},
+	{"@37c10000038c0002", "Richter"},
+	{"@033f0001008f0502", "Jeremiah"},
+	{"@09c9040102990e02", "Bowser - Golf"},
+	{"@019e000100ad0502", "Booker"},
+	{"@02ec000101c40502", "Lucky"},
+	{"@0182000002400502", "K. K. Slider"},
+	{"@01b5000100510502", "Luna"},
+	{"@049e000101b70502", "Doc"},
+	{"@0454000101ae0502", "Celia"},
+	{"@0399000101c20502", "Hippeux"},
+	{"@09cd010102aa0e02", "Baby Luigi - Soccer"},
+	{"@04ec000100770502", "Poppy"},
+	{"@04b2000101b90502", "Tank"},
+	{"@01c1020103bb0502", "Lottie - Island"},
+	{"@02f9000101020502", "Marcel"},
+	{"@018a000100a90502", "Reese"},
+	{"@06420000035f1102", "Pikmin"},
+	{"@03a40001014f0502", "Buck"},
+	{"@04e7000101320502", "Ricky"},
+	{"@0461000101610502", "Cube"},
+	{"@3840000104241902", "Yuga Ohdo"},
+	{"@09ce010102af0e02", "Birdo - Soccer"},
+	{"@09c30301027a0e02", "Daisy - Tennis"},
+	{"@03d6000101570502", "Astrid"},
+	{"@01810100023f0502", "Isabelle - Winter Outfit"},
+	{"@0193000002480502", "Celeste"},
+	{"@0003010200420302", "Pink Yarn Yoshi"},
+	{"@3804000103971702", "Ganda"},
+	{"@09c3020102790e02", "Daisy - Baseball"},
+	{"@09c9030102980e02", "Bowser - Tennis"},
+	{"@0469000101640502", "Boomer"},
+	{"@0009000002650102", "Diddy Kong"},
+	{"@000900030432ff02", "Diddy Kong - Power Up Band"},
+	{"@03c40001012b0502", "Canberra"},
+	{"@09d1040102c10e02", "Pink Gold Peach - Golf"},
+	{"@050b000100990502", "Chief"},
+	{"@08000200036a0402", "Inkling Boy - Neon Green"},
+	{"@0394000100890502", "Biff"},
+	{"@06c00000000f0002", "Little Mac"},
+	{"@03b1000100f00502", "Julian"},
+	{"@0265000101540502", "Moe"},
+	{"@09cc020102a60e02", "Baby Mario - Baseball"},
+	{"@01a1000101100502", "Phyllis"},
+	{"@0a0a000103c10502", "Megan"},
+	{"@0003010200410302", "Green Yarn Yoshi"},
+	{"@02f3000102f90502", "Maddie"},
+	{"@04ce000100db0502", "Wendy"},
+	{"@04dd000100a20502", "Peanut"},
+	{"@0a19000103d00502", "Chabwick"},
+	{"@0198000100b10502", "Leila"},
+	{"@22410000041e0002", "Pyra"},
+	{"@0374010103190502", "Rilla"},
+	{"@0180000000080002", "Villager"},
+	{"@0188000103af0502", "Mabel"},
+	{"@049b000100610502", "Tiffany"},
+	{"@09ca0401029e0e02", "Bowser Jr. - Golf"},
+	{"@1f03000002570c02", "Waddle Dee"},
+	{"@02c7000101220502", "Del"},
+	{"@02f2000100cc0502", "Cookie"},
+	{"@09c70301028e0e02", "Donkey Kong - Tennis"},
+	{"@01810000037d0002", "Isabelle"},
+	{"@34c0000002530002", "Ryu"},
+	{"@34c2000004aa1d02", "Luke"},
+	{"@34c2000104ab1d02", "Luke"},
+	{"@34c3000004ac1d02", "Jamie"},
+	{"@34c3000104ad1d02", "Jamie"},
+	{"@34cc000104b71d02", "Manon"},
+	{"@34c4000004ae1d02", "Kimberly"},
+	{"@34c4000104af1d02", "Kimberly"},
+	{"@34cd000104b81d02", "Marisa"},
+	{"@34d0000104bb1d02", "Lily"},
+	{"@34ce000104b91d02", "JP"},
+	{"@34c7000104b21d02", "Juri"},
+	{"@34cb000104b61d02", "Dee Jay"},
+	{"@34d1000104bc1d02", "Cammy"},
+	{"@34c0000104a81d02", "Ryu"},
+	{"@34ca000104b51d02", "E. Honda"},
+	{"@34c8000104b31d02", "Blanka"},
+	{"@34c6000104b11d02", "Guile"},
+	{"@34c1000104a91d02", "Ken"},
+	{"@34c5000104b01d02", "Chun-Li"},
+	{"@34cf000104ba1d02", "Zangief"},
+	{"@34c9000104b41d02", "Dhalsim"},
+	{"@34d2000104bd1d02", "Rashid"},
+	{"@34d3000104be1d02", "A.K.I"},
+	{"@34d4000104bf1d02", "Ed"},
+	{"@34d5000104c01d02", "Akuma"},
+	{"@34d6000104e11d02", "M. Bison"},
+	{"@3c80000104e81d02", "Terry"},
+	{"@3c81000104f21d02", "Mai"},
+	{"@34d8000104e31d02", "Elena"},
+	{"@34d9000104e41d02", "Sagat"},
+	{"@34da000104e51d02", "C. Viper"},
+	{"@34db000104e61d02", "Alex"},
+	{"@34dc000104e71d02", "Ingrid"},
+	{"@34c2000104cd1d02", "Luke"},
+	{"@34c3000104ce1d02", "Jamie"},
+	{"@34cc000104d71d02", "Manon"},
+	{"@34c4000104cf1d02", "Kimberly"},
+	{"@34cd000104d81d02", "Marisa"},
+	{"@34d0000104db1d02", "Lily"},
+	{"@34ce000104d91d02", "JP"},
+	{"@34c7000104d21d02", "Juri"},
+	{"@34cb000104d61d02", "Dee Jay"},
+	{"@34d1000104dc1d02", "Cammy"},
+	{"@34c0000104cb1d02", "Ryu"},
+	{"@34ca000104d51d02", "E. Honda"},
+	{"@34c8000104d31d02", "Blanka"},
+	{"@34c6000104d11d02", "Guile"},
+	{"@34c1000104cc1d02", "Ken"},
+	{"@34c5000104d01d02", "Chun-Li"},
+	{"@34cf000104da1d02", "Zangief"},
+	{"@34c9000104d41d02", "Dhalsim"},
+	{"@34d2000104dd1d02", "Rashid"},
+	{"@34d3000104de1d02", "A.K.I"},
+	{"@34d4000104df1d02", "Ed"},
+	{"@34d5000104e01d02", "Akuma"},
+	{"@34d6000104eb1d02", "M. Bison"},
+	{"@3c80000104f11d02", "Terry"},
+	{"@3c81000104f31d02", "Mai"},
+	{"@34d8000104ec1d02", "Elena"},
+	{"@34d9000104ed1d02", "Sagat"},
+	{"@34da000104ee1d02", "C. Viper"},
+	{"@34db000104ef1d02", "Alex"},
+	{"@34dc000104f01d02", "Ingrid"},
+	{"@0398000100bf0502", "Harry"},
+	{"@0401000100660502", "Deli"},
+	{"@02e00101031d0502", "Chelsea"},
+	{"@01020100001b0002", "Ganondorf"},
+	{"@09c30401027b0e02", "Daisy - Golf"},
+	{"@09d1030102c00e02", "Pink Gold Peach - Tennis"},
+	{"@03e6000100ec0502", "Bud"},
+	{"@3a00000003a10002", "Joker"},
+	{"@03710001005c0502", "Al"},
+	{"@03fe000101a40502", "Elise"},
+	{"@05c3000003800002", "Dark Samus"},
+	{"@03db0001006d0502", "Marcie"},
+	{"@0216000100570502", "Curt"},
+	{"@05150001005b0502", "Kyle"},
+	{"@2105010003630002", "Corrin - Player 2"},
+	{"@024a000101d10502", "Angus"},
+	{"@0478000101630502", "Curly"},
+	{"@00030003039fff02", "Yoshi - Power Up Band"},
+	{"@09c00401026c0e02", "Mario - Golf"},
+	{"@09cd040102ad0e02", "Baby Luigi - Golf"},
+	{"@09c5050102860e02", "Wario - Horse Racing"},
+	{"@09ca0201029c0e02", "Bowser Jr. - Baseball"},
+	{"@01810201011a0502", "Isabelle - Kimono"},
+	{"@033c000101000502", "Drift"},
+	{"@0327000101c30502", "Margie"},
+	{"@030d000101840502", "Mallary"},
+	{"@09c9020102970e02", "Bowser - Baseball"},
+	{"@1f02000002560c02", "King Dedede"},
+	{"@09c10201026f0e02", "Luigi - Baseball"},
+	{"@07820000002f0002", "Duck Hunt"},
+	{"@03ab000103160502", "Cleo"},
+	{"@018c010101180502", "Digby - Raincoat"},
+	{"@09cf050102b80e02", "Rosalina - Horse Racing"},
+	{"@0a0d000103c40502", "Cyd"},
+	{"@0005000000390102", "Bowser"},
+	{"@0a20000103d70502", "Faith"},
+	{"@03ad000101b20502", "Annalise"},
+	{"@00000000003d0102", "Mario - Silver Edition"},
+	{"@1bd7000003860002", "Incineroar"},
+	{"@09c4050102810e02", "Yoshi - Horse Racing"},
+	{"@02c9000100cd0502", "Sly"},
+	{"@0299000100950502", "Goose"},
+	{"@0804000003770402", "Marina"},
+	{"@0804000004390402", "Marina - Side Order"},
+	{"@32400000025b0002", "Bayonetta"},
+	{"@03080001014d0502", "Joey"},
+	{"@1d40000003870002", "Pokemon Trainer"},
+	{"@0262000101370502", "Tangy"},
+	{"@0488000100980502", "Pancetti"},
+	{"@05c20000037f0002", "Ridley"},
+	{"@09c70401028f0e02", "Donkey Kong - Golf"},
+	{"@036d000103040502", "Louie"},
+	{"@040c000101590502", "Dora"},
+	{"@02a50001018c0502", "Broffina"},
+	{"@043e000101490502", "Blanche"},
+	{"@09c00501026d0e02", "Mario - Horse Racing"},
+	{"@03ee0001008b0502", "Lionel"},
+	{"@023d000101b50502", "Jacques"},
+	{"@04c5000101010502", "Vesta"},
+	{"@0356000101350502", "Chevre"},
+	{"@02fc0001018f0502", "Shep"},
+	{"@35c20000036d0a02", "Specter Knight"},
+	{"@0511000101950502", "Fang"},
+	{"@0181050103bf0502", "Isabelle - Sweater"},
+	{"@04970001007a0502", "Snake"},
+	{"@0a1c000103d30502", "Rio"},
+	{"@028b000100e30502", "Pekoe"},
+	{"@0193000101740502", "Celeste"},
+	{"@02b70001030f0502", "Norma"},
+	{"@02eb000100de0502", "Butch"},
+	{"@04ee0001014b0502", "Marshal"},
+	{"@0805030003900402", "Octoling Octopus"},
+	{"@0000000002380602", "8-Bit Mario Classic Color"},
+	{"@0000050004e90102", "Mario and Luma"},
+	{"@0260000100d20502", "Olivia"},
+	{"@01010000000e0002", "Zelda"},
+	{"@05c0000003651302", "Samus Aran"},
+	{"@02d8000100e20502", "Zell"},
+	{"@03830001009b0502", "Clay"},
+	{"@09cb030102a20e02", "Boo - Tennis"},
+	{"@02ea000101800502", "Goldie"},
+	{"@3802000103951702", "Yabe"},
+	{"@22800000002c0002", "Ness"},
+	{"@35c10000036c0a02", "Plague Knight"},
+	{"@03410001030e0502", "Tad"},
+	{"@041d0001018a0502", "Penelope"},
+	{"@09cf040102b70e02", "Rosalina - Golf"},
+	{"@07420000001f0002", "Palutena"},
+	{"@04cd000101520502", "Curlos"},
+	{"@04100001007f0502", "Samson"},
+	{"@01a6000100500502", "Saharah"},
+	{"@03d9000101a50502", "Walt"},
+	{"@043b000103030502", "Julia"},
+	{"@037e000101560502", "Hamlet"},
+	{"@0220000100fd0502", "Charlise"},
+	{"@03c0000103100502", "Gonzo"},
+	{"@0323000100760502", "Opal"},
+	{"@046c0001008c0502", "Flo"},
+	{"@02a4000100720502", "Knox"},
+	{"@0008000002640102", "Donkey Kong"},
+	{"@00080100042f1a02", "Donkey Kong && Pauline"},
+	{"@000800030431ff02", "Donkey Kong - Power Up Band"},
+	{"@02fb000100900502", "Cherry"},
+	{"@018d0000024c0502", "Rover"},
+	{"@03820001016b0502", "Soleil"},
+	{"@028d000101bd0502", "Barold"},
+	{"@09ce020102b00e02", "Birdo - Baseball"},
+	{"@000a000000380102", "Toad"},
+	{"@04000001006f0502", "Shari"},
+	{"@01a30001004a0502", "Joan"},
+	{"@09ca0101029b0e02", "Bowser Jr. - Soccer"},
+	{"@04ed000100620502", "Sheldon"},
+	{"@028c0001013e0502", "Chester"},
+	{"@09cd050102ae0e02", "Baby Luigi - Horse Racing"},
+	{"@021f000103170502", "Ike"},
+	{"@0197000101770502", "Leilani"},
+	{"@0514000101530502", "Skye"},
+	{"@0a02000103b30502", "C.J."},
+	{"@09d0020102ba0e02", "Metal Mario - Baseball"},
+	{"@09c00201026a0e02", "Mario - Baseball"},
+	{"@0194000103b60502", "Kicks"},
+	{"@04c8000102ed0502", "Stella"},
+	{"@0510000101070502", "Freya"},
+	{"@0a0e000103c50502", "Judy"},
+	{"@036a0001019d0502", "Peewee"},
+	{"@0183030103be0502", "Tom Nook - Coat"},
+	{"@09c8030102930e02", "Diddy Kong - Tennis"},
+	{"@018f000100b30502", "Don Resetti"},
+	{"@04b9000101600502", "Merengue"},
+	{"@04d10001009e0502", "Muffy"},
+	{"@22430000043d1b02", "Noah"},
+	{"@22440000043e1b02", "Mio"},
+	{"@3f000000042e0002", "Sora"},
+	{"@1f00000004c41e03", "Kirby (&& Warp Star)"},
+	{"@1f03010004c91e03", "Bandana Waddle Dee (&& Winged Star)"},
+	{"@010d000004a70902", "Mineru's Construct"},
+	{"@1f02000004c71e03", "King Dedede (&& Tank Star)"},
+	{"@0807000004f70402", "Shiver (Splatoon Raiders)"},
+	{"@0808000004f80402", "Frye (Splatoon Raiders)"},
+	{"@0809000004f90402", "Big Man (Splatoon Raiders)"},
+	{"@3540000005032002", "Grace Ashcroft"},
+	{"@3541000005042002", "Leon S. Kennedy"},
+	{"@1f04000004ca1e03", "Chef Kawasaki (&& Hop Star)"},
+};
 
-static std::map<std::string, std::string> amiibos_series = {{"0a", "Shovel Knight"},
-                                                            {"0c", "Kirby"},
-                                                            {"0e", "Mario Sports Superstars"},
-                                                            {"0d", "Pokemon"},
-                                                            {"0f", "Monster Hunter"},
-                                                            {"06", "8-bit Mario"},
-                                                            {"12", "Fire Emblem"},
-                                                            {"13", "Metroid"},
-                                                            {"10", "BoxBoy!"},
-                                                            {"11", "Pikmin"},
-                                                            {"05", "Animal Crossing"},
-                                                            {"04", "Splatoon"},
-                                                            {"14", "Others"},
-                                                            {"15", "Mega Man"},
-                                                            {"09", "Legend Of Zelda"},
-                                                            {"18", "Monster Hunter Rise"},
-                                                            {"19", "Yu-Gi-Oh!"},
-                                                            {"01", "Super Mario Bros."},
-                                                            {"ff", "Super Nintendo World"},
-                                                            {"00", "Super Smash Bros."},
-                                                            {"03", "Yoshi's Woolly World"},
-                                                            {"02", "Chibi-Robo!"},
-                                                            {"07", "Skylanders"},
-                                                            {"16", "Diablo"},
-                                                            {"17", "Power Pros"},
-                                                            {"1a", "Donkey Kong"},
-                                                            {"1b", "Xenoblade Chronicles 3"},
-                                                            {"1c", "My Mario Wooden Blocks"},
-                                                            {"1d", "Street Fighter 6"},
-                                                            {"1e", "Kirby Air Riders"},
-                                                            {"21", "Pragmata"}};
+static std::map<std::string, std::string> amiibos_series = {
+	{"0a", "Shovel Knight"},
+	{"0c", "Kirby"},
+	{"0e", "Mario Sports Superstars"},
+	{"0d", "Pokemon"},
+	{"0f", "Monster Hunter"},
+	{"06", "8-bit Mario"},
+	{"12", "Fire Emblem"},
+	{"13", "Metroid"},
+	{"10", "BoxBoy!"},
+	{"11", "Pikmin"},
+	{"05", "Animal Crossing"},
+	{"04", "Splatoon"},
+	{"14", "Others"},
+	{"15", "Mega Man"},
+	{"09", "Legend Of Zelda"},
+	{"18", "Monster Hunter Rise"},
+	{"19", "Yu-Gi-Oh!"},
+	{"01", "Super Mario Bros."},
+	{"ff", "Super Nintendo World"},
+	{"00", "Super Smash Bros."},
+	{"03", "Yoshi's Woolly World"},
+	{"02", "Chibi-Robo!"},
+	{"07", "Skylanders"},
+	{"16", "Diablo"},
+	{"17", "Power Pros"},
+	{"1a", "Donkey Kong"},
+	{"1b", "Xenoblade Chronicles 3"},
+	{"1c", "My Mario Wooden Blocks"},
+	{"1d", "Street Fighter 6"},
+	{"1e", "Kirby Air Riders"},
+	{"20", "Resident Evil"},
+	{"21", "Pragmata"}
+};
 
 static std::map<std::string, std::map<std::string, int>> amiibos_usages = {
     {"0004000000064900",
@@ -4683,10 +4706,6 @@ GMainWindow::GMainWindow(Core::System& system_)
             if (i >= args.size() - 1 || args[i + 1].startsWith(QChar::fromLatin1('-'))) {
                 continue;
             }
-            if (!DynamicLibrary::FFmpeg::LoadFFmpeg()) {
-                ShowFFmpegErrorMessage();
-                continue;
-            }
             video_dumping_path = args[++i];
             video_dumping_on_start = true;
             continue;
@@ -4864,6 +4883,11 @@ GMainWindow::GMainWindow(Core::System& system_)
 
     LOG_INFO(Frontend, "Azahar Version: {} | {}-{}", Common::g_build_fullname, Common::g_scm_branch,
              Common::g_scm_desc);
+    std::string build_variant = Common::g_build_variant;
+    if (build_variant == "") {
+        build_variant = "N/A";
+    }
+    LOG_INFO(Frontend, "Build Variant: {}", build_variant);
 #if CITRA_ARCH(x86_64)
     const auto& caps = Common::GetCPUCaps();
     std::string cpu_string = caps.cpu_string;
@@ -4892,6 +4916,11 @@ GMainWindow::GMainWindow(Core::System& system_)
     secondary_window->setWindowIcon(azahar_icon);
 
     show();
+
+    // If the theme is updated before show() it doesn't apply properly, so do it again here.
+    // We still need the earlier call to make sure that the icons are set up correctly in the
+    // game list.
+    UpdateUITheme();
 
 #ifdef __APPLE__
     if (AppleUtils::IsRunningFromTerminal()) {
@@ -4968,6 +4997,7 @@ GMainWindow::~GMainWindow() {
     if (!render_window->parent()) {
         delete render_window;
     }
+    filter->hotkey_registry = nullptr;
 
     Pica::g_debug_context.reset();
     Network::Shutdown();
@@ -4980,6 +5010,9 @@ void GMainWindow::InitializeWidgets() {
     secondary_window->hide();
     secondary_window->setParent(nullptr);
 
+#ifndef ENABLE_FFMPEG
+    ui->action_Dump_Video->setVisible(false);
+#endif
     game_list = new GameList(*play_time_manager, this);
     ui->horizontalLayout->addWidget(game_list);
 
@@ -5390,6 +5423,9 @@ void GMainWindow::InitializeHotkeys() {
     link_action_shortcut(ui->action_Restart, QStringLiteral("Restart Emulation"));
     link_action_shortcut(ui->action_Pause, QStringLiteral("Continue/Pause Emulation"));
     link_action_shortcut(ui->action_Stop, QStringLiteral("Stop Emulation"));
+    link_action_shortcut(ui->action_Configure, QStringLiteral("Configure"));
+    link_action_shortcut(ui->action_Configure_Current_Game,
+                         QStringLiteral("Configure Current Application"));
     link_action_shortcut(ui->action_Show_Filter_Bar, QStringLiteral("Toggle Filter Bar"));
     link_action_shortcut(ui->action_Show_Status_Bar, QStringLiteral("Toggle Status Bar"));
     link_action_shortcut(ui->action_Fullscreen, fullscreen);
@@ -5451,6 +5487,10 @@ void GMainWindow::InitializeHotkeys() {
     connect_shortcut(QStringLiteral("Toggle Turbo Mode"),
                      [&] { GMainWindow::SetTurboEnabled(!GMainWindow::IsTurboEnabled()); });
 
+    connect_shortcut(QStringLiteral("Enable Turbo"), [&] { GMainWindow::SetTurboEnabled(true); });
+
+    connect_shortcut(QStringLiteral("Disable Turbo"), [&] { GMainWindow::SetTurboEnabled(false); });
+
     connect_shortcut(QStringLiteral("Increase Speed Limit"), [&] { AdjustSpeedLimit(true); });
     connect_shortcut(QStringLiteral("Decrease Speed Limit"), [&] { AdjustSpeedLimit(false); });
 
@@ -5500,6 +5540,17 @@ void GMainWindow::InitializeHotkeys() {
             UpdateStatusBar();
         }
     });
+
+    // handle the Turbo Hold hotkey (use the same pattern for others!)
+    const QString turbo_hold = QStringLiteral("Turbo Mode (Hold)");
+    const QKeySequence turbo_seq = hotkey_registry.GetKeySequence(main_window, turbo_hold);
+    auto turbo_callback = [this](bool held) {
+        if (held && !emulation_running) {
+            return;
+        }
+        SetTurboEnabled(held);
+    };
+    hotkey_registry.SetHoldCallback(main_window, turbo_hold, turbo_callback);
 }
 
 void GMainWindow::SetDefaultUIGeometry() {
@@ -5574,16 +5625,83 @@ void GMainWindow::OnAppFocusStateChanged(Qt::ApplicationState state) {
     }
 }
 
+// helper method to check if a keyevent matches a key sequence.
+bool matchesKeyEvent(const QKeyEvent* event, const QKeySequence& seq) {
+    if (seq.isEmpty())
+        return false;
+
+    int seqKey = seq[0];
+    int eventKey = (event->key() | event->modifiers());
+    return eventKey == seqKey;
+}
+
+// Returns true if releasing the key in `event` should count as releasing `seq`,
+// i.e. the event is the sequence's main key or one of the sequence's modifiers.
+static bool releaseBreaksSequence(const QKeyEvent* event, const QKeySequence& seq) {
+    if (seq.isEmpty())
+        return false;
+
+    const int main_key = seq[0].key();
+    const Qt::KeyboardModifiers mods = seq[0].keyboardModifiers();
+
+    switch (event->key()) {
+    case Qt::Key_Control:
+        return mods.testFlag(Qt::ControlModifier);
+    case Qt::Key_Shift:
+        return mods.testFlag(Qt::ShiftModifier);
+    case Qt::Key_Alt:
+        return mods.testFlag(Qt::AltModifier);
+    case Qt::Key_Meta:
+        return mods.testFlag(Qt::MetaModifier);
+    default:
+        return event->key() == main_key;
+    }
+}
+
 bool GApplicationEventFilter::eventFilter(QObject* object, QEvent* event) {
     if (event->type() == QEvent::FileOpen) {
         emit FileOpen(static_cast<QFileOpenEvent*>(event));
         return true;
     }
+
+    if (hotkey_registry != nullptr &&
+        (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress)) {
+
+        QKeyEvent* key = static_cast<QKeyEvent*>(event);
+        for (auto const hk : hotkey_registry->hold_hotkeys) {
+            auto& seq = hk->keyseq;
+            if (seq.isEmpty() || !hk->hold_callback)
+                continue;
+            if (matchesKeyEvent(key, seq)) {
+                if (hotkeys_currently_held.insert(hk).second) {
+                    hk->hold_callback(true);
+                }
+                return true;
+            }
+        }
+    } else if (event->type() == QEvent::KeyRelease) {
+        QKeyEvent* key = static_cast<QKeyEvent*>(event);
+        if (key->isAutoRepeat()) {
+            return false;
+        }
+        const auto pressed = hotkeys_currently_held;
+        bool handled = false;
+        for (auto hk : pressed) {
+            auto& seq = hk->keyseq;
+            if (releaseBreaksSequence(key, seq)) {
+                hotkeys_currently_held.erase(hk);
+                if (hk->hold_callback)
+                    hk->hold_callback(false);
+                handled = true;
+            }
+        }
+        return handled;
+    }
     return false;
 }
 
 void GMainWindow::ConnectAppEvents() {
-    const auto filter = new GApplicationEventFilter();
+    filter->hotkey_registry = &hotkey_registry;
     QGuiApplication::instance()->installEventFilter(filter);
 
     connect(filter, &GApplicationEventFilter::FileOpen, this, &GMainWindow::OnFileOpen);
@@ -5626,6 +5744,7 @@ void GMainWindow::ConnectWidgetEvents() {
     connect(this, &GMainWindow::CIAInstallReport, this, &GMainWindow::OnCIAInstallReport);
     connect(this, &GMainWindow::CIAInstallFinished, this, &GMainWindow::OnCIAInstallFinished);
     connect(this, &GMainWindow::CompressFinished, this, &GMainWindow::OnCompressFinished);
+    connect(this, &GMainWindow::BundleFinished, this, &GMainWindow::OnBundleFinished);
     connect(this, &GMainWindow::UpdateThemedIcons, multiplayer_state,
             &MultiplayerState::UpdateThemedIcons);
 }
@@ -5728,7 +5847,9 @@ void GMainWindow::ConnectMenuEvents() {
         }
     });
     connect_menu(ui->action_Capture_Screenshot, &GMainWindow::OnCaptureScreenshot);
+#ifdef ENABLE_FFMPEG
     connect_menu(ui->action_Dump_Video, &GMainWindow::OnDumpVideo);
+#endif
 
     // Tools debug
     connect_menu(ui->action_Debug_Pause, [this] {
@@ -5754,6 +5875,8 @@ void GMainWindow::ConnectMenuEvents() {
     // Tools
     connect_menu(ui->action_Compress_ROM_File, &GMainWindow::OnCompressFile);
     connect_menu(ui->action_Decompress_ROM_File, &GMainWindow::OnDecompressFile);
+    connect_menu(ui->action_Create_ROM_Bundle, &GMainWindow::OnCreateBundle);
+    connect_menu(ui->action_Extract_ROM_Bundle, &GMainWindow::OnExtractBundle);
 
     // Help
     connect_menu(ui->action_Open_Log_Folder, []() {
@@ -5804,9 +5927,9 @@ void GMainWindow::UpdateMenuState() {
     ui->action_Advance_Frame->setEnabled(emulation_running && is_paused);
 
     if (emulation_running && is_paused) {
-        ui->action_Pause->setText(tr("&Continue"));
+        ui->action_Pause->setText(tr("Continue"));
     } else {
-        ui->action_Pause->setText(tr("&Pause"));
+        ui->action_Pause->setText(tr("Pause"));
     }
 }
 
@@ -5925,9 +6048,10 @@ bool GMainWindow::LoadROM(const QString& filename) {
         QString invalid_format_description =
             tr("The application file format not supported.<br>Please make sure you are using one "
                "of the compatible file formats:<ul><li>Cartridge images: "
-               "<b>.cci/.zcci/.3ds</b></li><li>Installable archives: "
-               "<b>.cia/.zcia</b></li><li>Homebrew titles: <b>.3dsx/.z3dsx</b></li><li>NCCH "
-               "containers: <b>.cxi/.zcxi/.app</b></li><li>ELF files: <b>.elf/.axf</b></li></ul>");
+               "<b>.cci/.zcci/.bcci/.3ds</b></li><li>Installable archives: "
+               "<b>.cia/.zcia/.bcia</b></li><li>Homebrew titles: <b>.3dsx/.z3dsx</b></li><li>NCCH "
+               "containers: <b>.cxi/.zcxi/.bcxi/.app</b></li><li>ELF files: "
+               "<b>.elf/.axf</b></li></ul>");
 
         switch (result) {
         case Core::System::ResultStatus::ErrorGetLoader:
@@ -5978,7 +6102,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
             break;
         case Core::System::ResultStatus::ErrorLoader:
             QMessageBox::critical(this, tr("Generic load error"),
-                                  tr("An generic load error occurred while loading the "
+                                  tr("A generic load error occurred while loading the "
                                      "application.<br/>Please check the log for more details."));
             break;
         case Core::System::ResultStatus::ErrorLoader_ErrorPatches:
@@ -6003,7 +6127,7 @@ bool GMainWindow::LoadROM(const QString& filename) {
     }
 
     std::string title;
-    system.GetAppLoader().ReadTitle(title);
+    system.GetAppLoader().ReadTitle(title, true);
     game_title = QString::fromStdString(title);
     UpdateWindowTitle();
 
@@ -6019,6 +6143,23 @@ bool GMainWindow::LoadROM(const QString& filename) {
 void GMainWindow::BootGame(const QString& filename) {
     if (emu_thread) {
         ShutdownGame();
+    }
+
+    // NOTE: We could make this not hardcoded, but it's a temp thing anyway so probs not worth. -OS
+    if (Settings::values.graphics_api.GetValue() == Settings::GraphicsAPI::Vulkan &&
+        Settings::values.texture_filter.GetValue() == Settings::TextureFilter::Anime4K) {
+        const auto answer = QMessageBox::warning(
+            this, tr("Incompatible texture filter"),
+            tr("The selected texture filter (Anime4K) is not compatible with the Vulkan "
+               "renderer.\nThe texture filter will be set to None.\nProceed?"),
+            QMessageBox::Yes | QMessageBox::No);
+
+        if (answer == QMessageBox::No) {
+            return;
+        }
+        if (answer == QMessageBox::Yes) {
+            Settings::values.texture_filter = Settings::TextureFilter::NoFilter;
+        }
     }
 
     const bool is_artic = filename.startsWith(QString::fromStdString("articbase:/")) ||
@@ -6103,11 +6244,13 @@ void GMainWindow::BootGame(const QString& filename) {
 
     ui->action_Advance_Frame->setEnabled(false);
 
+#ifdef ENABLE_FFMPEG
     if (video_dumping_on_start) {
         StartVideoDumping(video_dumping_path);
         video_dumping_on_start = false;
         video_dumping_path.clear();
     }
+#endif()
 
     // Register debug widgets
     if (graphicsWidget->isVisible()) {
@@ -6177,12 +6320,14 @@ void GMainWindow::ShutdownGame() {
         HideFullscreen();
     }
 
+#ifdef ENABLE_FFMPEG
     auto video_dumper = system.GetVideoDumper();
     if (video_dumper && video_dumper->IsDumping()) {
         game_shutdown_delayed = true;
         OnStopVideoDumping();
         return;
     }
+#endif
 
     AllowOSSleep();
 
@@ -6348,28 +6493,21 @@ void GMainWindow::UpdateSaveStates() {
         if (savestate.slot >= Core::SaveStateSlotCount) {
             continue;
         }
-        const bool display_name =
-            savestate.status == Core::SaveStateInfo::ValidationStatus::RevisionDismatch &&
-            !savestate.build_name.empty();
         actions_load_state[savestate.slot]->setEnabled(true);
         if (savestate.slot == 0) {
-            const auto text = tr("%2 %3")
+            const auto text = QStringLiteral("%2")
                                   .arg(QDateTime::fromSecsSinceEpoch(savestate.time)
                                            .toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
-                                  .arg(display_name ? QString::fromStdString(savestate.build_name)
-                                                    : QLatin1String())
                                   .trimmed();
             ui->action_Quick_Save->setText(tr("Quick Save - %1").arg(text).trimmed());
             ui->action_Quick_Load->setText(tr("Quick Load - %1").arg(text).trimmed());
             continue;
         }
-        const auto text =
-            tr("Slot %1 - %2 %3")
-                .arg(savestate.slot)
-                .arg(QDateTime::fromSecsSinceEpoch(savestate.time)
-                         .toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
-                .arg(display_name ? QString::fromStdString(savestate.build_name) : QLatin1String())
-                .trimmed();
+        const auto text = tr("Slot %1 - %2")
+                              .arg(savestate.slot)
+                              .arg(QDateTime::fromSecsSinceEpoch(savestate.time)
+                                       .toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
+                              .trimmed();
 
         actions_load_state[savestate.slot]->setText(text);
         actions_save_state[savestate.slot]->setText(text);
@@ -6498,7 +6636,7 @@ bool GMainWindow::CreateShortcutLink(const std::filesystem::path& shortcut_path,
                                      const std::string& categories, const std::string& keywords,
                                      const std::string& name, const bool& skip_tryexec) try {
 #if defined(__linux__) || defined(__FreeBSD__) // Linux and FreeBSD
-    std::filesystem::path shortcut_path_full = shortcut_path / (name + ".desktop");
+    std::filesystem::path shortcut_path_full = shortcut_path / PathFromUTF8(name + ".desktop");
     std::ofstream shortcut_stream(shortcut_path_full, std::ios::binary | std::ios::trunc);
     if (!shortcut_stream.is_open()) {
         LOG_ERROR(Frontend, "Failed to create shortcut");
@@ -6513,7 +6651,7 @@ bool GMainWindow::CreateShortcutLink(const std::filesystem::path& shortcut_path,
         fmt::print(shortcut_stream, "Comment={}\n", comment);
     }
     if (std::filesystem::is_regular_file(icon_path)) {
-        fmt::print(shortcut_stream, "Icon={}\n", icon_path.string());
+        fmt::print(shortcut_stream, "Icon={}\n", PathToUTF8(icon_path));
     }
     if (!skip_tryexec) {
         fmt::print(shortcut_stream, "TryExec={}\n", command);
@@ -6633,25 +6771,27 @@ bool GMainWindow::MakeShortcutIcoPath(const u64 program_id, const std::string_vi
     // Get path to Citra icons directory & icon extension
     std::string ico_extension = "png";
 #if defined(_WIN32)
-    out_icon_path = FileUtil::GetUserPath(FileUtil::UserPath::IconsDir);
+    out_icon_path = PathFromUTF8(FileUtil::GetUserPath(FileUtil::UserPath::IconsDir));
     ico_extension = "ico";
 #elif defined(__linux__) || defined(__FreeBSD__)
-    out_icon_path = FileUtil::GetUserDirectory("XDG_DATA_HOME") + "/icons/hicolor/256x256/";
+    out_icon_path =
+        PathFromUTF8(FileUtil::GetUserDirectory("XDG_DATA_HOME") + "/icons/hicolor/256x256/");
 #endif
     // Create icons directory if it doesn't exist
-    if (!FileUtil::CreateFullPath(out_icon_path.string())) {
+    if (!FileUtil::CreateFullPath(PathToUTF8(out_icon_path))) {
         QMessageBox::critical(
             this, tr("Create Icon"),
             tr("Cannot create icon file. Path \"%1\" does not exist and cannot be created.")
-                .arg(QString::fromStdString(out_icon_path.string())),
+                .arg(QString::fromStdString(PathToUTF8(out_icon_path))),
             QMessageBox::StandardButton::Ok);
         out_icon_path.clear();
         return false;
     }
 
     // Create icon file path
-    out_icon_path /= (program_id == 0 ? fmt::format("citra-{}.{}", game_file_name, ico_extension)
-                                      : fmt::format("citra-{:016X}.{}", program_id, ico_extension));
+    out_icon_path /=
+        PathFromUTF8(program_id == 0 ? fmt::format("citra-{}.{}", game_file_name, ico_extension)
+                                     : fmt::format("citra-{:016X}.{}", program_id, ico_extension));
     return true;
 }
 
@@ -6676,10 +6816,10 @@ void GMainWindow::OnGameListCreateShortcut(u64 program_id, const std::string& ga
     // Shortcut path
     std::filesystem::path shortcut_path{};
     if (target == GameListShortcutTarget::Desktop) {
-        shortcut_path =
-            QStandardPaths::writableLocation(QStandardPaths::DesktopLocation).toStdString();
+        shortcut_path = PathFromUTF8(
+            QStandardPaths::writableLocation(QStandardPaths::DesktopLocation).toStdString());
     } else if (target == GameListShortcutTarget::Applications) {
-        shortcut_path = GetApplicationsDirectory();
+        shortcut_path = PathFromUTF8(GetApplicationsDirectory());
     }
 
     // Icon path and title
@@ -6692,7 +6832,7 @@ void GMainWindow::OnGameListCreateShortcut(u64 program_id, const std::string& ga
     // Get title from game file
     const auto loader = Loader::GetLoader(game_path);
     std::string game_title = fmt::format("{:016X}", program_id);
-    if (loader->ReadTitle(game_title) != Loader::ResultStatus::Success) {
+    if (loader->ReadTitle(game_title, false) != Loader::ResultStatus::Success) {
         game_title = fmt::format("{:016x}", program_id);
     }
 
@@ -6706,7 +6846,7 @@ void GMainWindow::OnGameListCreateShortcut(u64 program_id, const std::string& ga
 
     // Get icon from game file
     std::vector<u8> icon_image_file;
-    if (loader->ReadIcon(icon_image_file) != Loader::ResultStatus::Success) {
+    if (loader->ReadIcon(icon_image_file, false) != Loader::ResultStatus::Success) {
         LOG_WARNING(Frontend, "Could not read icon from {:s}", game_path);
     }
 
@@ -6772,7 +6912,7 @@ void GMainWindow::OnGameListDumpRomFS(QString game_path, u64 program_id) {
                 const auto& [base, update] = future_watcher->result();
                 if (base != Loader::ResultStatus::Success) {
                     QMessageBox::critical(
-                        this, tr("Azahar"),
+                        this, QStringLiteral("Azahar"),
                         tr("Could not dump base RomFS.\nRefer to the log for details."));
                     return;
                 }
@@ -6846,9 +6986,8 @@ void GMainWindow::OnGameListOpenPerGameProperties(const QString& file) {
 void GMainWindow::OnMenuLoadFile() {
     const QString extensions = QStringLiteral("*.").append(
         GameList::supported_file_extensions.join(QStringLiteral(" *.")));
-    const QString file_filter = tr("3DS Executable (%1);;All Files (*.*)",
-                                   "%1 is an identifier for the 3DS executable file extensions.")
-                                    .arg(extensions);
+    const QString file_filter = tr("3DS Executable") + QStringLiteral(" (%1)").arg(extensions) +
+                                QStringLiteral(";;") + tr("All Files") + QStringLiteral(" (*.*)");
     const QString filename = QFileDialog::getOpenFileName(
         this, tr("Load File"), UISettings::values.roms_path, file_filter);
 
@@ -6893,7 +7032,7 @@ void GMainWindow::OnMenuSetUpSystemFiles() {
     QLineEdit textInput(UISettings::values.last_artic_base_addr, &dialog);
     layout_h.addWidget(&textInput);
 
-    QLabel label_select(tr("<br>Choose setup mode:"), &dialog);
+    QLabel label_select(QStringLiteral("<br>") + tr("Choose setup mode:"), &dialog);
     layout.addWidget(&label_select);
 
     std::pair<bool, bool> install_state = Core::AreSystemTitlesInstalled();
@@ -6957,7 +7096,8 @@ void GMainWindow::OnMenuSetUpSystemFiles() {
 void GMainWindow::OnMenuInstallCIA() {
     QStringList filepaths = QFileDialog::getOpenFileNames(
         this, tr("Load Files"), UISettings::values.roms_path,
-        tr("3DS Installation File (*.cia *.zcia)") + QStringLiteral(";;") + tr("All Files (*.*)"));
+        tr("3DS Installation File") + QStringLiteral(" (*.cia *.zcia *.bcia);;") + tr("All Files") +
+            QStringLiteral(" (*.*)"));
 
     if (filepaths.isEmpty()) {
         return;
@@ -7080,7 +7220,7 @@ void GMainWindow::InstallCIA(QStringList filepaths) {
 
     emit UpdateProgress(0, 0);
 
-    (void)QtConcurrent::run([&, filepaths] {
+    (void)QtConcurrent::run([this, filepaths] {
         Service::AM::InstallStatus status;
         const auto cia_progress = [&](std::size_t written, std::size_t total) {
             emit UpdateProgress(written, total);
@@ -7132,6 +7272,8 @@ void GMainWindow::OnCIAInstallReport(Service::AM::InstallStatus status, QString 
         QMessageBox::critical(this, tr("Unable to find File"),
                               tr("Could not find %1").arg(filename));
         break;
+    case Service::AM::InstallStatus::ErrorCannotCheckBundle:
+        break;
     }
 }
 
@@ -7154,6 +7296,29 @@ void GMainWindow::OnCompressFinished(bool is_compress, bool success) {
         } else {
             QMessageBox::information(this, tr("Z3DS Compression"),
                                      tr("All files have been decompressed successfully."));
+        }
+    }
+}
+
+void GMainWindow::OnBundleFinished(bool is_bundle, bool success) {
+    progress_bar->hide();
+    progress_bar->setValue(0);
+
+    if (!success) {
+        if (is_bundle) {
+            QMessageBox::critical(this, tr("Bundle File"),
+                                  tr("Failed to create the bundle, check log for details."));
+        } else {
+            QMessageBox::critical(this, tr("Bundle File"),
+                                  tr("Failed to extract the bundle, check log for details."));
+        }
+    } else {
+        if (is_bundle) {
+            QMessageBox::information(this, tr("Bundle File"),
+                                     tr("Bundle has been created successfully."));
+        } else {
+            QMessageBox::information(this, tr("Bundle File"),
+                                     tr("Bundle has been extracted successfully."));
         }
     }
 }
@@ -7210,9 +7375,10 @@ void GMainWindow::UninstallTitles(
     future_watcher.waitForFinished();
 
     if (failed) {
-        QMessageBox::critical(this, tr("Azahar"), tr("Failed to uninstall '%1'.").arg(failed_name));
+        QMessageBox::critical(this, QStringLiteral("Azahar"),
+                              tr("Failed to uninstall '%1'.").arg(failed_name));
     } else if (!future_watcher.isCanceled()) {
-        QMessageBox::information(this, tr("Azahar"),
+        QMessageBox::information(this, QStringLiteral("Azahar"),
                                  tr("Successfully uninstalled '%1'.").arg(first_name));
     }
 }
@@ -7636,7 +7802,7 @@ void GMainWindow::ToggleScreenLayout() {
 
 void GMainWindow::OnSwapScreens() {
     Settings::values.swap_screen = ui->action_Screen_Layout_Swap_Screens->isChecked();
-    system.ApplySettings();
+    system.GPU().Renderer().UpdateCurrentFramebufferLayout();
 }
 
 void GMainWindow::OnRotateScreens() {
@@ -7825,7 +7991,8 @@ void GMainWindow::OnLoadAmiibo() {
     }
 
     const QString extensions{QStringLiteral("*.bin")};
-    const QString file_filter = tr("Amiibo File (%1);; All Files (*.*)").arg(extensions);
+    const QString file_filter = tr("Amiibo File") + QStringLiteral(" (%1);;").arg(extensions) +
+                                tr("All Files") + QStringLiteral(" (*.*)");
     const QString filename = QFileDialog::getOpenFileName(this, tr("Load Amiibo"), {}, file_filter);
 
     if (filename.isEmpty()) {
@@ -8016,44 +8183,15 @@ void GMainWindow::OnCaptureScreenshot() {
     }
 }
 
-void GMainWindow::ShowFFmpegErrorMessage() {
-    QMessageBox message_box;
-    message_box.setWindowTitle(tr("Could not load video dumper"));
-    message_box.setText(
-        tr("FFmpeg could not be loaded. Make sure you have a compatible version installed."
-#ifdef _WIN32
-           "\n\nTo install FFmpeg to Azahar, press Open and select your FFmpeg directory."
-#endif
-           "\n\nTo view a guide on how to install FFmpeg, press Help."));
-    message_box.setStandardButtons(QMessageBox::Ok | QMessageBox::Help
-#ifdef _WIN32
-                                   | QMessageBox::Open
-#endif
-    );
-    auto result = message_box.exec();
-    if (result == QMessageBox::Help) {
-        QDesktopServices::openUrl(
-            QUrl(QStringLiteral("https://web.archive.org/web/20240301121456/https://"
-                                "citra-emu.org/wiki/installing-ffmpeg-for-the-video-dumper/")));
-#ifdef _WIN32
-    } else if (result == QMessageBox::Open) {
-        OnOpenFFmpeg();
-#endif
-    }
-}
-
+#ifdef ENABLE_FFMPEG
 void GMainWindow::OnDumpVideo() {
-    if (DynamicLibrary::FFmpeg::LoadFFmpeg()) {
-        if (ui->action_Dump_Video->isChecked()) {
-            OnStartVideoDumping();
-        } else {
-            OnStopVideoDumping();
-        }
+    if (ui->action_Dump_Video->isChecked()) {
+        OnStartVideoDumping();
     } else {
-        ui->action_Dump_Video->setChecked(false);
-        ShowFFmpegErrorMessage();
+        OnStopVideoDumping();
     }
 }
+#endif
 
 void GMainWindow::OnCompressFile() {
     // NOTE: Encrypted files SHOULD NEVER be compressed, otherwise the resulting
@@ -8063,10 +8201,10 @@ void GMainWindow::OnCompressFile() {
     //
     // This is enforced using the loaders as they already return an error on encryption.
 
-    QStringList filepaths =
-        QFileDialog::getOpenFileNames(this, tr("Load 3DS ROM Files"), UISettings::values.roms_path,
-                                      tr("3DS ROM Files (*.cia *.cci *.3dsx *.cxi *.3ds)") +
-                                          QStringLiteral(";;") + tr("All Files (*.*)"));
+    QStringList filepaths = QFileDialog::getOpenFileNames(
+        this, tr("Load 3DS ROM Files"), UISettings::values.roms_path,
+        tr("3DS ROM Files") + QStringLiteral(" (*.cia *.cci *.3dsx *.cxi *.3ds);;") +
+            tr("All Files") + QStringLiteral(" (*.*)"));
 
     QString out_path;
 
@@ -8077,21 +8215,31 @@ void GMainWindow::OnCompressFile() {
     bool single_file = filepaths.size() == 1;
     if (single_file) {
         // If it's a single file, ask the user for the output file.
-        auto compress_info = Loader::GetCompressFileInfo(filepaths[0].toStdString(), true);
-        if (!compress_info.has_value()) {
+        auto compress_info = Loader::GetLoaderFileInfo(filepaths[0].toStdString());
+        if (!compress_info.is_valid || !compress_info.is_compress_supported) {
+            LOG_ERROR(Frontend,
+                      "Error compressing file {}, the selected file is not a compatible 3DS ROM "
+                      "format or is encrypted or bundled.",
+                      filepaths[0].toStdString());
+            emit CompressFinished(true, false);
+            return;
+        }
+        if (compress_info.is_compressed) {
+            LOG_ERROR(Frontend,
+                      "Error compressing file {}, the selected file is already compressed.",
+                      filepaths[0].toStdString());
             emit CompressFinished(true, false);
             return;
         }
 
         QFileInfo fileinfo(filepaths[0]);
-        QString final_path =
-            fileinfo.path() + QStringLiteral(DIR_SEP) + fileinfo.completeBaseName() +
-            QStringLiteral(".") +
-            QString::fromStdString(compress_info.value().first.recommended_compressed_extension);
+        QString final_path = fileinfo.path() + QStringLiteral(DIR_SEP) +
+                             fileinfo.completeBaseName() + QStringLiteral(".") +
+                             QString::fromStdString(compress_info.recommended_compressed_extension);
 
-        QString out_filter = tr("3DS Compressed ROM File (*.%1)")
-                                 .arg(QString::fromStdString(
-                                     compress_info.value().first.recommended_compressed_extension));
+        QString out_filter =
+            tr("3DS Compressed ROM File") + QStringLiteral(" (*.%1)").arg(QString::fromStdString(
+                                                compress_info.recommended_compressed_extension));
         out_path = QFileDialog::getSaveFileName(this, tr("Save 3DS Compressed ROM File"),
                                                 final_path, out_filter);
         if (out_path.isEmpty()) {
@@ -8107,7 +8255,7 @@ void GMainWindow::OnCompressFile() {
         }
     }
 
-    (void)QtConcurrent::run([&, filepaths, out_path] {
+    (void)QtConcurrent::run([this, filepaths, out_path] {
         bool single_file = filepaths.size() == 1;
         QString out_filepath;
         bool total_success = true;
@@ -8117,8 +8265,20 @@ void GMainWindow::OnCompressFile() {
             std::string in_path = filepath.toStdString();
 
             // Identify file type
-            auto compress_info = Loader::GetCompressFileInfo(filepath.toStdString(), true);
-            if (!compress_info.has_value()) {
+            auto compress_info = Loader::GetLoaderFileInfo(filepath.toStdString());
+            if (!compress_info.is_valid || !compress_info.is_compress_supported) {
+                LOG_ERROR(
+                    Frontend,
+                    "Error decompressing file {}, the selected file is not a compatible 3DS ROM "
+                    "format or is encrypted or bundled.",
+                    in_path);
+                total_success = false;
+                continue;
+            }
+            if (compress_info.is_compressed) {
+                LOG_ERROR(Frontend,
+                          "Error compressing file {}, the selected file is already compressed.",
+                          in_path);
                 total_success = false;
                 continue;
             }
@@ -8127,10 +8287,10 @@ void GMainWindow::OnCompressFile() {
                 out_filepath = out_path;
             } else {
                 QFileInfo fileinfo(filepath);
-                out_filepath = out_path + QStringLiteral(DIR_SEP) + fileinfo.completeBaseName() +
-                               QStringLiteral(".") +
-                               QString::fromStdString(
-                                   compress_info.value().first.recommended_compressed_extension);
+                out_filepath =
+                    out_path + QStringLiteral(DIR_SEP) + fileinfo.completeBaseName() +
+                    QStringLiteral(".") +
+                    QString::fromStdString(compress_info.recommended_compressed_extension);
             }
 
             std::string out_path = out_filepath.toStdString();
@@ -8140,10 +8300,10 @@ void GMainWindow::OnCompressFile() {
             const auto progress = [&](std::size_t written, std::size_t total) {
                 emit UpdateProgress(written, total);
             };
-            bool success = FileUtil::CompressZ3DSFile(in_path, out_path,
-                                                      compress_info.value().first.underlying_magic,
-                                                      compress_info.value().second, progress,
-                                                      compress_info.value().first.default_metadata);
+            bool success =
+                FileUtil::CompressZ3DSFile(in_path, out_path, compress_info.underlying_magic,
+                                           compress_info.default_compress_frame_size, progress,
+                                           compress_info.default_metadata);
             if (!success) {
                 total_success = false;
                 FileUtil::Delete(out_path);
@@ -8158,8 +8318,8 @@ void GMainWindow::OnDecompressFile() {
 
     QStringList filepaths = QFileDialog::getOpenFileNames(
         this, tr("Load 3DS Compressed ROM Files"), UISettings::values.roms_path,
-        tr("3DS Compressed ROM Files (*.zcia *zcci *z3dsx *zcxi)") + QStringLiteral(";;") +
-            tr("All Files (*.*)"));
+        tr("3DS Compressed ROM Files") + QStringLiteral(" (*.zcia *zcci *z3dsx *zcxi)") +
+            QStringLiteral(";;") + tr("All Files") + QStringLiteral(" (*.*)"));
 
     QString out_path;
 
@@ -8170,22 +8330,31 @@ void GMainWindow::OnDecompressFile() {
     bool single_file = filepaths.size() == 1;
     if (single_file) {
         // If it's a single file, ask the user for the output file.
-        auto compress_info = Loader::GetCompressFileInfo(filepaths[0].toStdString(), false);
-        if (!compress_info.has_value()) {
+        auto compress_info = Loader::GetLoaderFileInfo(filepaths[0].toStdString());
+        if (!compress_info.is_valid || !compress_info.is_compress_supported) {
+            LOG_ERROR(Frontend,
+                      "Error decompressing file {}, the selected file is not a compatible 3DS ROM "
+                      "format.",
+                      filepaths[0].toStdString());
+            emit CompressFinished(false, false);
+            return;
+        }
+        if (!compress_info.is_compressed) {
+            LOG_ERROR(Frontend,
+                      "Error decompressing file {}, the selected file is already decompressed",
+                      filepaths[0].toStdString());
             emit CompressFinished(false, false);
             return;
         }
 
         QFileInfo fileinfo(filepaths[0]);
-        QString final_path =
-            fileinfo.path() + QStringLiteral(DIR_SEP) + fileinfo.completeBaseName() +
-            QStringLiteral(".") +
-            QString::fromStdString(compress_info.value().first.recommended_uncompressed_extension);
+        QString final_path = fileinfo.path() + QStringLiteral(DIR_SEP) +
+                             fileinfo.completeBaseName() + QStringLiteral(".") +
+                             QString::fromStdString(compress_info.recommended_plain_extension);
 
-        QString out_filter =
-            tr("3DS ROM File (*.%1)")
-                .arg(QString::fromStdString(
-                    compress_info.value().first.recommended_uncompressed_extension));
+        QString out_filter = tr("3DS ROM File") +
+                             QStringLiteral(" (*.%1)").arg(
+                                 QString::fromStdString(compress_info.recommended_plain_extension));
         out_path =
             QFileDialog::getSaveFileName(this, tr("Save 3DS ROM File"), final_path, out_filter);
         if (out_path.isEmpty()) {
@@ -8201,7 +8370,7 @@ void GMainWindow::OnDecompressFile() {
         }
     }
 
-    (void)QtConcurrent::run([&, filepaths, out_path] {
+    (void)QtConcurrent::run([this, filepaths, out_path] {
         bool single_file = filepaths.size() == 1;
         QString out_filepath;
         bool total_success = true;
@@ -8211,8 +8380,20 @@ void GMainWindow::OnDecompressFile() {
             std::string in_path = filepath.toStdString();
 
             // Identify file type
-            auto compress_info = Loader::GetCompressFileInfo(filepath.toStdString(), false);
-            if (!compress_info.has_value()) {
+            auto compress_info = Loader::GetLoaderFileInfo(filepath.toStdString());
+            if (!compress_info.is_valid || !compress_info.is_compress_supported) {
+                LOG_ERROR(
+                    Frontend,
+                    "Error decompressing file {}, the selected file is not a compatible 3DS ROM "
+                    "format.",
+                    in_path);
+                total_success = false;
+                continue;
+            }
+            if (!compress_info.is_compressed) {
+                LOG_ERROR(Frontend,
+                          "Error decompressing file {}, the selected file is already decompressed.",
+                          in_path);
                 total_success = false;
                 continue;
             }
@@ -8223,8 +8404,7 @@ void GMainWindow::OnDecompressFile() {
                 QFileInfo fileinfo(filepath);
                 out_filepath = out_path + QStringLiteral(DIR_SEP) + fileinfo.completeBaseName() +
                                QStringLiteral(".") +
-                               QString::fromStdString(
-                                   compress_info.value().first.recommended_uncompressed_extension);
+                               QString::fromStdString(compress_info.recommended_plain_extension);
             }
 
             std::string out_path = out_filepath.toStdString();
@@ -8247,62 +8427,101 @@ void GMainWindow::OnDecompressFile() {
     });
 }
 
-#ifdef _WIN32
-void GMainWindow::OnOpenFFmpeg() {
-    auto filename =
-        QFileDialog::getExistingDirectory(this, tr("Select FFmpeg Directory")).toStdString();
-    if (filename.empty()) {
+void GMainWindow::OnCreateBundle() {
+    QString filepath = QFileDialog::getOpenFileName(
+        this, tr("Load Main 3DS ROM File"), UISettings::values.roms_path,
+        tr("3DS ROM Files") + QStringLiteral(" (*.cci *.zcci *.cia *.zcia *.cxi *.3ds);;") +
+            tr("All Files") + QStringLiteral(" (*.*)"));
+
+    if (filepath.isEmpty()) {
         return;
     }
-    // Check for a bin directory if they chose the FFmpeg root directory.
-    auto bin_dir = filename + DIR_SEP + "bin";
-    if (!FileUtil::Exists(bin_dir)) {
-        // Otherwise, assume the user directly selected the directory containing the DLLs.
-        bin_dir = filename;
+
+    std::string in_path = filepath.toStdString();
+
+    auto file_info = Loader::GetLoaderFileInfo(filepath.toStdString());
+    if (!file_info.is_valid || !file_info.is_bundle_supported) {
+        LOG_ERROR(Frontend,
+                  "Error bundling file {}, the selected file is not a compatible 3DS ROM "
+                  "format.",
+                  in_path);
+        emit BundleFinished(true, false);
+        return;
+    }
+    if (file_info.is_bundled) {
+        LOG_ERROR(Frontend, "Error bundling file {}, the selected file is already bundled.",
+                  in_path);
+        emit BundleFinished(true, false);
+        return;
     }
 
-    static const std::array library_names = {
-        Common::DynamicLibrary::GetLibraryName("avcodec", LIBAVCODEC_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("avfilter", LIBAVFILTER_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("avformat", LIBAVFORMAT_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("avutil", LIBAVUTIL_VERSION_MAJOR),
-        Common::DynamicLibrary::GetLibraryName("swresample", LIBSWRESAMPLE_VERSION_MAJOR),
-    };
+    QFileInfo fileinfo(filepath);
+    QString final_path = fileinfo.path() + QStringLiteral(DIR_SEP) + fileinfo.completeBaseName() +
+                         QStringLiteral(".") +
+                         QString::fromStdString(file_info.recommended_bundle_extension);
 
-    for (auto& library_name : library_names) {
-        if (!FileUtil::Exists(bin_dir + DIR_SEP + library_name)) {
-            QMessageBox::critical(this, tr("Azahar"),
-                                  tr("The provided FFmpeg directory is missing %1. Please make "
-                                     "sure the correct directory was selected.")
-                                      .arg(QString::fromStdString(library_name)));
+    QString out_filter = tr("3DS Bundle ROM File") +
+                         QStringLiteral(" (*.%1)").arg(
+                             QString::fromStdString(file_info.recommended_bundle_extension));
+
+    QString out_path = QFileDialog::getSaveFileName(this, tr("Select Output 3DS Bundled ROM File"),
+                                                    final_path, out_filter);
+    if (out_path.isEmpty()) {
+        return;
+    }
+
+    QStringList depends = QFileDialog::getOpenFileNames(
+        this, tr("Load CIA File Dependencies"), UISettings::values.roms_path,
+        tr("3DS ROM Files") + QStringLiteral(" (*.cia *.zcia);;") + tr("All Files") +
+            QStringLiteral(" (*.*)"));
+
+    if (depends.isEmpty()) {
+        return;
+    }
+
+    std::vector<std::string> depends_vector;
+
+    for (const QString& dep : depends) {
+
+        std::string dep_path = dep.toStdString();
+
+        // Identify file type
+        auto dep_file_info = Loader::GetLoaderFileInfo(dep_path);
+        if (!dep_file_info.is_valid || !dep_file_info.is_bundle_supported ||
+            dep_file_info.is_bundled ||
+            dep_file_info.underlying_magic != std::array<u8, 4>({'C', 'I', 'A', '\0'})) {
+            LOG_ERROR(Frontend,
+                      "Error processing dependency file {}, the selected file is not a compatible "
+                      "CIA file.",
+                      dep_path);
+            emit BundleFinished(true, false);
             return;
         }
+
+        depends_vector.push_back(dep_path);
     }
 
-    std::atomic<bool> success(true);
-    auto process_file = [&success](u64* num_entries_out, const std::string& directory,
-                                   const std::string& virtual_name) -> bool {
-        auto file_path = directory + DIR_SEP + virtual_name;
-        if (file_path.ends_with(".dll")) {
-            auto destination_path = FileUtil::GetExeDirectory() + DIR_SEP + virtual_name;
-            if (!FileUtil::Copy(file_path, destination_path)) {
-                success.store(false);
-                return false;
-            }
-        }
-        return true;
-    };
-    FileUtil::ForeachDirectoryEntry(nullptr, bin_dir, process_file);
+    emit UpdateProgress(0, 0);
 
-    if (success.load()) {
-        QMessageBox::information(this, tr("Azahar"), tr("FFmpeg has been sucessfully installed."));
-    } else {
-        QMessageBox::critical(this, tr("Azahar"),
-                              tr("Installation of FFmpeg failed. Check the log file for details."));
-    }
+    (void)QtConcurrent::run([this, out_path, in_path, depends_vector] {
+        const auto progress = [&](std::size_t written, std::size_t total) {
+            emit UpdateProgress(written, total);
+        };
+
+        [[maybe_unused]] auto result =
+            Loader::CreateBundleFile(out_path.toStdString(), in_path, depends_vector, progress);
+        emit BundleFinished(true, result == Loader::ResultStatus::Success);
+    });
 }
-#endif
 
+void GMainWindow::OnExtractBundle() {
+    // TODO(PabloMK7): Implement before 2127 release, do not translate temporary strings.
+    QMessageBox::warning(
+        this, tr("Bundle File"),
+        QStringLiteral("Bundle extraction is not implemented yet, please use a TAR file browser."));
+}
+
+#ifdef ENABLE_FFMPEG
 void GMainWindow::OnStartVideoDumping() {
     DumpingDialog dialog(this, system);
     if (dialog.exec() != QDialog::DialogCode::Accepted) {
@@ -8327,7 +8546,7 @@ void GMainWindow::StartVideoDumping(const QString& path) {
         system.RegisterVideoDumper(dumper);
     } else {
         QMessageBox::critical(
-            this, tr("Azahar"),
+            this, QStringLiteral("Azahar"),
             tr("Could not start video dumping.<br>Please ensure that the video encoder is "
                "configured correctly.<br>Refer to the log for details."));
         ui->action_Dump_Video->setChecked(false);
@@ -8363,6 +8582,7 @@ void GMainWindow::OnStopVideoDumping() {
         future_watcher->setFuture(future);
     }
 }
+#endif
 
 void GMainWindow::UpdateStatusBar() {
     if (!emu_thread) [[unlikely]] {
@@ -8412,7 +8632,7 @@ void GMainWindow::UpdateStatusBar() {
                                tr("(Accessing SaveData)")),
             };
 
-        const QString unit = do_mb ? tr("MB/s") : tr("KB/s");
+        const QString unit = do_mb ? QStringLiteral("MB/s") : QStringLiteral("KB/s");
         QString event{};
         for (auto p : perf_events) {
             if (results.artic_events.Get(p.first)) {
@@ -8626,8 +8846,76 @@ void GMainWindow::showEvent([[maybe_unused]] QShowEvent* event) {
     game_list->PopulateAsync(UISettings::values.game_dirs);
 }
 
+bool GMainWindow::ShowExceptionDialog(Core::System::ResultStatus result,
+                                      const std::string& details) {
+    QDialog dialog(this);
+    dialog.setWindowTitle(result == Core::System::ResultStatus::ErrorCoreExceptionRaised
+                              ? tr("An exception occurred")
+                              : tr("An invalid memory access occurred"));
+
+    dialog.setMinimumSize(600, 500);
+
+    auto* layout = new QVBoxLayout(&dialog);
+
+    auto* label = new QLabel(
+        result == Core::System::ResultStatus::ErrorCoreExceptionRaised
+            ? tr("An exception occurred while executing the emulated application.")
+            : tr("An invalid memory access occurred while executing the emulated application."));
+
+    layout->addWidget(label);
+
+    auto* textEdit = new QPlainTextEdit();
+    textEdit->setPlainText(QString::fromStdString(details));
+    textEdit->setReadOnly(true);
+    QFont monoFont(QStringLiteral("Monospace"));
+    monoFont.setStyleHint(QFont::TypeWriter);
+    monoFont.setPointSize(10);
+    textEdit->setFont(monoFont);
+    textEdit->setLineWrapMode(QPlainTextEdit::NoWrap);
+    layout->addWidget(textEdit);
+
+    auto* buttonLayout = new QHBoxLayout();
+
+    auto* ignoreButton = new QPushButton(tr("Ignore for this Session"));
+
+    QObject::connect(ignoreButton, &QPushButton::clicked,
+                     []() { Core::SetIgnoreExceptionsForSession(true); });
+
+    buttonLayout->addWidget(ignoreButton);
+    buttonLayout->addStretch();
+
+    auto* continueButton = new QPushButton(tr("Continue"));
+    QObject::connect(continueButton, &QPushButton::clicked, &dialog, &QDialog::reject);
+    buttonLayout->addWidget(continueButton);
+
+    auto* stopButton = new QPushButton(tr("Stop Emulation"));
+    QObject::connect(stopButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    buttonLayout->addWidget(stopButton);
+
+    layout->addLayout(buttonLayout);
+
+    return dialog.exec() == QDialog::Accepted;
+}
+
 void GMainWindow::OnCoreError(Core::System::ResultStatus result, std::string details) {
     QString status_message;
+
+    // Handle exception dialogs separately
+    if (result == Core::System::ResultStatus::ErrorCoreExceptionRaised) {
+        if (ShowExceptionDialog(result, details)) {
+            if (emu_thread) {
+                ShutdownGame();
+                return;
+            }
+        }
+
+        if (emu_thread) {
+            emu_thread->SetRunning(true);
+            message_label->setText(status_message);
+            message_label_used_for_movie = false;
+        }
+        return;
+    }
 
     QString title, message;
     QMessageBox::Icon error_severity_icon;
@@ -8650,7 +8938,8 @@ void GMainWindow::OnCoreError(Core::System::ResultStatus result, std::string det
         error_severity_icon = QMessageBox::Icon::Critical;
     } else if (result == Core::System::ResultStatus::ErrorSavestate) {
         title = tr("Save/load Error");
-        message = QString::fromStdString(details);
+        message = tr("The savestate could not be created or restored.<br/><br/>%1")
+                      .arg(QString::fromStdString(details).toHtmlEscaped());
         error_severity_icon = QMessageBox::Icon::Warning;
     } else if (result == Core::System::ResultStatus::ErrorArticDisconnected) {
         title = tr("Artic Server");
@@ -8659,17 +8948,26 @@ void GMainWindow::OnCoreError(Core::System::ResultStatus result, std::string det
                    .c_str());
         error_severity_icon = QMessageBox::Icon::Critical;
         can_continue = false;
-    } else if (result == Core::System::ResultStatus::ErrorCoreExceptionRaised) {
-        title = tr("An exception occurred");
-        message = tr("An exception occurred while executing the emulated application.\n\n");
-        message += QString::fromStdString(details);
-        error_severity_icon = QMessageBox::Icon::Critical;
-        can_continue = false;
-    } else if (result == Core::System::ResultStatus::ErrorMemoryExceptionRaised) {
-        title = tr("An invalid memory access occurred");
+    } else if (result == Core::System::ResultStatus::ErrorShaderCacheCrash) {
+        title = tr("Shader Cache Crash");
         message =
-            tr("An invalid memory access occurred while executing the emulated application.\n\n");
-        message += QString::fromStdString(details);
+            tr("Azahar closed unexpectedly the last time it built the Vulkan shader cache of the "
+               "current title. The graphics driver may have crashed on one of the cached shaders, "
+               "and continuing may crash it again.<br/><br/>To reset the shader cache, "
+               "right-click the application in the game list and select "
+               "<b>Disk Shader Cache &gt; Delete Vulkan Shader Cache</b>.");
+        status_message = tr("Shader cache crash");
+        error_severity_icon = QMessageBox::Icon::Critical;
+    } else if (result == Core::System::ResultStatus::ErrorSavestateBuildMismatch) {
+        title = tr("Savestate version mismatch");
+        message = tr("Could not load savestate because it was created on a different Azahar "
+                     "version:<br/>"
+                     "<b>Azahar %1</b>.<br/><br/>Please read our blog entry <a "
+                     "href='https://azahar-emu.org/blog/understanding-save-states/'>understanding "
+                     "savestates</a> for more information.<br/><br/>To recover your progress, "
+                     "downgrade to <b>Azahar %1</b>, load this savestate and use the application's "
+                     "built-in save functionality.")
+                      .arg(QString::fromStdString(details));
         error_severity_icon = QMessageBox::Icon::Critical;
     } else {
         title = tr("Fatal Error");
@@ -8763,7 +9061,7 @@ bool GMainWindow::ConfirmClose() {
     }
 
     QMessageBox::StandardButton answer =
-        QMessageBox::question(this, tr("Azahar"), tr("Would you like to exit now?"),
+        QMessageBox::question(this, QStringLiteral("Azahar"), tr("Would you like to exit now?"),
                               QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     return answer != QMessageBox::No;
 }
@@ -8797,8 +9095,9 @@ static bool IsSingleFileDropEvent(const QMimeData* mime) {
     return mime->hasUrls() && mime->urls().length() == 1;
 }
 
-static const std::array<std::string, 11> AcceptedExtensions = {
-    "cci", "cxi", "bin", "3dsx", "app", "elf", "axf", "zcci", "zcxi", "z3dsx", "3ds"};
+static const std::array<std::string, 13> AcceptedExtensions = {
+    "cci",  "cxi",  "bin",   "3dsx", "app",  "elf", "axf",
+    "zcci", "zcxi", "z3dsx", "3ds",  "bcci", "bcxi"};
 
 static bool IsCorrectFileExtension(const QMimeData* mime) {
     const QString& filename = mime->urls().at(0).toLocalFile();
@@ -8859,7 +9158,7 @@ bool GMainWindow::ConfirmChangeGame() {
     }
 
     auto answer = QMessageBox::question(
-        this, tr("Azahar"),
+        this, QStringLiteral("Azahar"),
         tr("The application is still running. Would you like to stop emulation?"),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     return answer != QMessageBox::No;
@@ -8884,17 +9183,21 @@ inline bool isDarkMode() {
 
 void GMainWindow::UpdateUITheme() {
     const QString icons_base_path = QStringLiteral(":/icons/");
+    const QString default_system_theme = QStringLiteral("default");
+    const QString light_icon_system_theme = QStringLiteral("default_with_light_icons");
+    const QString colorful_icon_system_theme = QStringLiteral("colorful");
+
     QString default_theme;
     if (!isDarkMode()) {
-        default_theme = QStringLiteral("default");
+        default_theme = default_system_theme;
     } else {
-        default_theme = QStringLiteral("default_with_light_icons");
+        default_theme = light_icon_system_theme;
     }
 
     const QString default_theme_path = icons_base_path + default_theme;
 
     const QString& current_theme = UISettings::values.theme;
-    const bool is_default_theme = current_theme == QString::fromUtf8(UISettings::themes[0].second);
+    const bool is_default_theme = (current_theme == default_system_theme);
     QStringList theme_paths(default_theme_paths);
 
     if (is_default_theme || current_theme.isEmpty()) {
@@ -8927,6 +9230,13 @@ void GMainWindow::UpdateUITheme() {
         theme_paths.append({default_theme_path, current_theme_path});
         QIcon::setThemeName(current_theme);
     }
+
+#ifdef _WIN32
+    if (current_theme == default_system_theme || current_theme == light_icon_system_theme ||
+        current_theme == colorful_icon_system_theme) {
+        SetCustomWindowsScrollbar();
+    }
+#endif
 
     QIcon::setThemeSearchPaths(theme_paths);
 }
@@ -9326,6 +9636,48 @@ static Qt::HighDpiScaleFactorRoundingPolicy GetHighDpiRoundingPolicy() {
     return Qt::HighDpiScaleFactorRoundingPolicy::PassThrough;
 #endif
 }
+
+#ifdef _WIN32
+void GMainWindow::SetCustomWindowsScrollbar() {
+    constexpr auto customScrollbarStyleTemplate = (R"(
+        QScrollBar:vertical {{
+            background: palette(window);
+            width: 16px;
+            margin: 0px;
+            border-left: 1px solid palette({0});
+        }}
+        QScrollBar::handle:vertical {{
+            background: palette({1});
+            border: none;
+            border-radius: 4px;
+            margin: 3px;
+        }}
+        QScrollBar::handle:vertical:hover {{
+            background: palette({0});
+        }}
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+            border: none;
+            height: 0px;
+        }}
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+            background: none;
+        }}
+    )");
+
+    const auto darkCustomScrollbarStyle =
+        QString::fromUtf8(std::format(customScrollbarStyleTemplate, "midlight", "light"));
+    const auto lightCustomScrollbarStyle =
+        QString::fromUtf8(std::format(customScrollbarStyleTemplate, "dark", "mid"));
+
+    const bool isDarkMode = (QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+
+    if (isDarkMode) {
+        setStyleSheet(darkCustomScrollbarStyle);
+    } else {
+        setStyleSheet(lightCustomScrollbarStyle);
+    }
+}
+#endif
 
 int LaunchQtFrontend(int argc, char* argv[]) {
 #ifdef __APPLE__

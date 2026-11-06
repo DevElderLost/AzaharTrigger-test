@@ -1,6 +1,6 @@
-// Copyright Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 #pragma once
 
@@ -57,6 +57,13 @@ public:
 
     void SetSDLJoystick(SDL_Joystick* joystick, SDL_GameController* controller);
 
+    // Hat presses under the SDL Joystick API do not send press and release signals like
+    // normal buttons, instead only sending directions up, down, left, right, and center.
+    // Thus we need to store which hat direction was pressed so we can interpret the
+    // center signal as a release for the appropriate direction.
+    // the empty string means we do not have anything currently stored as the pressed direction.
+    std::string current_hat_down = "";
+
 private:
     struct State {
         Common::Vec3<float> accel;
@@ -69,8 +76,10 @@ private:
     bool has_accel{false};
     std::unique_ptr<SDL_Joystick, void (*)(SDL_Joystick*)> sdl_joystick;
     std::unique_ptr<SDL_GameController, void (*)(SDL_GameController*)> sdl_controller;
+    std::unordered_map<int, int16_t> joystick_axis_centers;
     mutable std::mutex mutex;
     std::unordered_set<int> mapped_joystick_buttons;
     void CreateControllerButtonMap();
+    void CalibrateJoystickAxes();
 };
 } // namespace InputCommon::SDL

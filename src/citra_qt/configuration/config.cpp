@@ -1,6 +1,6 @@
-// Copyright Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2014-2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 #include <algorithm>
 #include <array>
@@ -16,7 +16,6 @@
 #include "input_common/main.h"
 #include "input_common/udp/client.h"
 #include "network/network.h"
-#include "network/network_settings.h"
 
 QtConfig::QtConfig(const std::string& config_name, ConfigType config_type) : type{config_type} {
     global = config_type == ConfigType::GlobalConfig;
@@ -63,6 +62,8 @@ const std::vector<UISettings::Shortcut> QtConfig::default_hotkeys{ {
      {QStringLiteral("Audio Volume Down"),        QStringLiteral("Main Window"), {QStringLiteral(""),       QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Audio Volume Up"),          QStringLiteral("Main Window"), {QStringLiteral(""),       QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Capture Screenshot"),       QStringLiteral("Main Window"), {QStringLiteral("Ctrl+P"), QStringLiteral(""), Qt::ApplicationShortcut}},
+     {QStringLiteral("Configure"),                QStringLiteral("Main Window"), {QStringLiteral("Ctrl+,"), QStringLiteral(""), Qt::ApplicationShortcut}},
+     {QStringLiteral("Configure Current Application"),        QStringLiteral("Main Window"), {QStringLiteral("Ctrl+."), QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Continue/Pause Emulation"), QStringLiteral("Main Window"), {QStringLiteral("F4"),     QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Debug Pause"),              QStringLiteral("Main Window"), {QStringLiteral(""),       QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Debug Resume"),             QStringLiteral("Main Window"), {QStringLiteral(""),       QStringLiteral(""), Qt::ApplicationShortcut}},
@@ -95,7 +96,6 @@ const std::vector<UISettings::Shortcut> QtConfig::default_hotkeys{ {
      {QStringLiteral("Toggle 3D"),                QStringLiteral("Main Window"), {QStringLiteral("Ctrl+3"), QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Toggle Custom Textures"),   QStringLiteral("Main Window"), {QStringLiteral("F7"),     QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Toggle Filter Bar"),        QStringLiteral("Main Window"), {QStringLiteral("Ctrl+F"), QStringLiteral(""), Qt::ApplicationShortcut}},
-     {QStringLiteral("Toggle Frame Advancing"),   QStringLiteral("Main Window"), {QStringLiteral("Ctrl+A"), QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Toggle Per-Application Speed"),  QStringLiteral("Main Window"), {QStringLiteral("Ctrl+Z"), QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Toggle Screen Layout"),     QStringLiteral("Main Window"), {QStringLiteral("F10"),    QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Toggle Status Bar"),        QStringLiteral("Main Window"), {QStringLiteral("Ctrl+S"), QStringLiteral(""), Qt::ApplicationShortcut}},
@@ -104,6 +104,7 @@ const std::vector<UISettings::Shortcut> QtConfig::default_hotkeys{ {
      {QStringLiteral("Toggle Virtual Touchpad (C-Stick)"), QStringLiteral("Main Window"), {QStringLiteral(""), QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Virtual Touchpad Drag/Drop"), QStringLiteral("Main Window"), {QStringLiteral(""), QStringLiteral(""), Qt::ApplicationShortcut}},
      {QStringLiteral("Virtual Touchpad Tap"),     QStringLiteral("Main Window"), {QStringLiteral(""),      QStringLiteral(""), Qt::ApplicationShortcut}},
+     {QStringLiteral("Turbo Mode (Hold)"),        QStringLiteral("Main Window"), {QStringLiteral(""),       QStringLiteral(""), Qt::ApplicationShortcut}},
     } };
 // clang-format on
 
@@ -235,15 +236,18 @@ void QtConfig::WriteBasicSetting(const Settings::Setting<std::vector<Type>, rang
     }
     qt_config->setValue(name, stringList);
 }
-// Explicit u16 definition: Qt would store it as QMetaType otherwise, which is not human-readable
-template <>
-void QtConfig::WriteBasicSetting(const Settings::Setting<u16>& setting) {
-    const QString name = QString::fromStdString(setting.GetLabel());
-    const u16& value = setting.GetValue();
-    if (global)
-        qt_config->setValue(name + QStringLiteral("/default"), value == setting.GetDefault());
-    qt_config->setValue(name, static_cast<u32>(value));
-}
+
+// Promote configuration types into simpler types so that Qt does not implicitly convert
+// configuration values into a QMetaType and ensures the ini files are human-readable
+template <typename T>
+using config_promoted_t = std::conditional_t<
+    // Preserve bools
+    std::is_same_v<T, bool>, bool,
+    // Signed/Unsigned integers get promoted to s64/u64
+    std::conditional_t<std::is_integral_v<T>,
+                       std::conditional_t<std::is_signed_v<T>, std::int64_t, std::uint64_t>,
+                       // Otherwise, leave the type unchanged
+                       T>>;
 
 template <typename Type, bool ranged>
 void QtConfig::WriteBasicSetting(const Settings::Setting<Type, ranged>& setting) {
@@ -252,9 +256,11 @@ void QtConfig::WriteBasicSetting(const Settings::Setting<Type, ranged>& setting)
     if (global)
         qt_config->setValue(name + QStringLiteral("/default"), value == setting.GetDefault());
     if constexpr (std::is_enum_v<Type>) {
-        qt_config->setValue(name, static_cast<std::underlying_type_t<Type>>(value));
+        using TypeU = std::underlying_type_t<Type>;
+        qt_config->setValue(
+            name, QVariant::fromValue<config_promoted_t<TypeU>>(static_cast<TypeU>(value)));
     } else {
-        qt_config->setValue(name, QVariant::fromValue(value));
+        qt_config->setValue(name, QVariant::fromValue<config_promoted_t<Type>>(value));
     }
 }
 
@@ -301,6 +307,7 @@ void QtConfig::ReadAudioValues() {
     if (global) {
         ReadBasicSetting(Settings::values.output_type);
         ReadBasicSetting(Settings::values.output_device);
+        ReadBasicSetting(Settings::values.bypass_audio_effects);
         ReadBasicSetting(Settings::values.input_type);
         ReadBasicSetting(Settings::values.input_device);
     }
@@ -487,6 +494,7 @@ void QtConfig::ReadCoreValues() {
 
     if (global) {
         ReadBasicSetting(Settings::values.use_cpu_jit);
+        ReadBasicSetting(Settings::values.use_fastinterp);
         ReadBasicSetting(Settings::values.delay_start_for_lle_modules);
     }
 
@@ -528,7 +536,7 @@ void QtConfig::ReadDebuggingValues() {
     ReadBasicSetting(Settings::values.instant_debug_log);
     ReadBasicSetting(Settings::values.enable_rpc_server);
     ReadBasicSetting(Settings::values.toggle_unique_data_console_type);
-    ReadBasicSetting(Settings::values.break_on_unmapped_memory_access);
+    ReadBasicSetting(Settings::values.enable_exception_handler);
 
     qt_config->beginGroup(QStringLiteral("LLE"));
     for (const auto& service_module : Service::service_module_map) {
@@ -607,12 +615,9 @@ void QtConfig::ReadMiscellaneousValues() {
 void QtConfig::ReadMultiplayerValues() {
     qt_config->beginGroup(QStringLiteral("Multiplayer"));
 
-    UISettings::values.nickname = ReadSetting(Settings::QKeys::nickname, QString{}).toString();
     UISettings::values.ip = ReadSetting(Settings::QKeys::ip, QString{}).toString();
     UISettings::values.port =
         ReadSetting(Settings::QKeys::port, Network::DefaultRoomPort).toString();
-    UISettings::values.room_nickname =
-        ReadSetting(Settings::QKeys::room_nickname, QString{}).toString();
     UISettings::values.room_name = ReadSetting(Settings::QKeys::room_name, QString{}).toString();
     UISettings::values.room_port =
         ReadSetting(Settings::QKeys::room_port, QStringLiteral("24872")).toString();
@@ -788,6 +793,9 @@ void QtConfig::ReadSystemValues() {
         ReadBasicSetting(Settings::values.init_time_offset);
         ReadBasicSetting(Settings::values.init_ticks_type);
         ReadBasicSetting(Settings::values.init_ticks_override);
+        ReadBasicSetting(Settings::values.battery_state_source);
+        ReadBasicSetting(Settings::values.battery_charging);
+        ReadBasicSetting(Settings::values.battery_level);
         ReadBasicSetting(Settings::values.steps_per_hour);
         ReadBasicSetting(Settings::values.plugin_loader_enabled);
         ReadBasicSetting(Settings::values.allow_plugin_loader);
@@ -873,6 +881,7 @@ void QtConfig::ReadUIValues() {
         ReadBasicSetting(UISettings::values.pause_when_in_background);
         ReadBasicSetting(UISettings::values.mute_when_in_background);
         ReadBasicSetting(UISettings::values.hide_mouse);
+        ReadBasicSetting(UISettings::values.use_on_screen_software_keyboard);
     }
 
     qt_config->endGroup();
@@ -925,17 +934,8 @@ void QtConfig::ReadUILayoutValues() {
 void QtConfig::ReadWebServiceValues() {
     qt_config->beginGroup(QStringLiteral("WebService"));
 
-    NetSettings::values.web_api_url =
-        ReadSetting(Settings::QKeys::web_api_url, QStringLiteral("http://88.198.47.46:5000"))
-            .toString()
-            .toStdString();
-    if (NetSettings::values.web_api_url == "https://api.citra-emu.org") {
-        NetSettings::values.web_api_url = "http://88.198.47.46:5000";
-    }
-    NetSettings::values.citra_username =
-        ReadSetting(Settings::QKeys::citra_username).toString().toStdString();
-    NetSettings::values.citra_token =
-        ReadSetting(Settings::QKeys::citra_token).toString().toStdString();
+    ReadBasicSetting(Settings::values.web_api_url);
+    ReadBasicSetting(Settings::values.network_token);
 
     qt_config->endGroup();
 }
@@ -973,6 +973,7 @@ void QtConfig::SaveAudioValues() {
     if (global) {
         WriteBasicSetting(Settings::values.output_type);
         WriteBasicSetting(Settings::values.output_device);
+        WriteBasicSetting(Settings::values.bypass_audio_effects);
         WriteBasicSetting(Settings::values.input_type);
         WriteBasicSetting(Settings::values.input_device);
     }
@@ -1096,6 +1097,7 @@ void QtConfig::SaveCoreValues() {
 
     if (global) {
         WriteBasicSetting(Settings::values.use_cpu_jit);
+        WriteBasicSetting(Settings::values.use_fastinterp);
         WriteBasicSetting(Settings::values.delay_start_for_lle_modules);
     }
 
@@ -1131,7 +1133,7 @@ void QtConfig::SaveDebuggingValues() {
     WriteBasicSetting(Settings::values.instant_debug_log);
     WriteBasicSetting(Settings::values.enable_rpc_server);
     WriteBasicSetting(Settings::values.toggle_unique_data_console_type);
-    WriteBasicSetting(Settings::values.break_on_unmapped_memory_access);
+    WriteBasicSetting(Settings::values.enable_exception_handler);
 
     qt_config->beginGroup(QStringLiteral("LLE"));
     for (const auto& service_module : Settings::values.lle_modules) {
@@ -1208,10 +1210,8 @@ void QtConfig::SaveMiscellaneousValues() {
 void QtConfig::SaveMultiplayerValues() {
     qt_config->beginGroup(QStringLiteral("Multiplayer"));
 
-    WriteSetting(Settings::QKeys::nickname, UISettings::values.nickname, QString{});
     WriteSetting(Settings::QKeys::ip, UISettings::values.ip, QString{});
     WriteSetting(Settings::QKeys::port, UISettings::values.port, Network::DefaultRoomPort);
-    WriteSetting(Settings::QKeys::room_nickname, UISettings::values.room_nickname, QString{});
     WriteSetting(Settings::QKeys::room_name, UISettings::values.room_name, QString{});
     WriteSetting(Settings::QKeys::room_port, UISettings::values.room_port, QStringLiteral("24872"));
     WriteSetting(Settings::QKeys::host_type, UISettings::values.host_type, 0);
@@ -1351,6 +1351,9 @@ void QtConfig::SaveSystemValues() {
         WriteBasicSetting(Settings::values.init_time_offset);
         WriteBasicSetting(Settings::values.init_ticks_type);
         WriteBasicSetting(Settings::values.init_ticks_override);
+        WriteBasicSetting(Settings::values.battery_state_source);
+        WriteBasicSetting(Settings::values.battery_charging);
+        WriteBasicSetting(Settings::values.battery_level);
         WriteBasicSetting(Settings::values.steps_per_hour);
         WriteBasicSetting(Settings::values.plugin_loader_enabled);
         WriteBasicSetting(Settings::values.allow_plugin_loader);
@@ -1419,6 +1422,7 @@ void QtConfig::SaveUIValues() {
         WriteBasicSetting(UISettings::values.pause_when_in_background);
         WriteBasicSetting(UISettings::values.mute_when_in_background);
         WriteBasicSetting(UISettings::values.hide_mouse);
+        WriteBasicSetting(UISettings::values.use_on_screen_software_keyboard);
     }
 
     qt_config->endGroup();
@@ -1469,13 +1473,8 @@ void QtConfig::SaveUILayoutValues() {
 void QtConfig::SaveWebServiceValues() {
     qt_config->beginGroup(QStringLiteral("WebService"));
 
-    WriteSetting(Settings::QKeys::web_api_url,
-                 QString::fromStdString(NetSettings::values.web_api_url),
-                 QStringLiteral("http://88.198.47.46:5000"));
-    WriteSetting(Settings::QKeys::citra_username,
-                 QString::fromStdString(NetSettings::values.citra_username));
-    WriteSetting(Settings::QKeys::citra_token,
-                 QString::fromStdString(NetSettings::values.citra_token));
+    WriteBasicSetting(Settings::values.web_api_url);
+    WriteBasicSetting(Settings::values.network_token);
 
     qt_config->endGroup();
 }

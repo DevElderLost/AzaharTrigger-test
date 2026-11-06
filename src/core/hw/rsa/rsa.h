@@ -1,8 +1,6 @@
-// FILE MODIFIED BY AzaharPlus APRIL 2025
-
-// Copyright Citra Emulator Project / Azahar Emulator Project
-// Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Copyright 2020-2026 Citra Emulator Project / Azahar Emulator Project
+// Licensed under GPLv3 or any later version
+// Refer to the LICENSE.txt file included.
 
 #pragma once
 
@@ -79,4 +77,9 @@ const RsaSlot& GetSecureInfoSlot();
 const RsaSlot& GetLocalFriendCodeSeedSlot();
 
 std::vector<u8> CreateASN1Message(std::span<const u8> data);
+const RsaSlot& GetEsRootSlot();
+
+const RsaSlot& GetAccessDescSlot();
+const RsaSlot& GetNcchCfaSlot();
+
 } // namespace HW::RSA

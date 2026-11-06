@@ -1,6 +1,6 @@
 // Copyright 2017 Citra Emulator Project
 // Licensed under GPLv2 or any later version
-// Refer to the license.txt file included.
+// Refer to the misc/licenses/gplv2.txt file included.
 
 #include <algorithm>
 #include <atomic>
@@ -10,6 +10,7 @@
 #include <thread>
 #include "common/assert.h"
 #include "common/file_util.h"
+#include "core/hle/service/am/am.h" // complete BundleCIAHandler type needed by ncch.h
 #include "core/loader/ncch.h"
 #include "core/zip_pass.h"
 #include "enet/enet.h"
