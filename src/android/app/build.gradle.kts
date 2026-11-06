@@ -25,6 +25,13 @@ val abiFilter = listOf("arm64-v8a", "x86_64")
 
 
 fun getFixedVersionCode(versionName: String): Int {
+    // Only treat the name as a version when it looks like "major.minor[.patch]".
+    // A bare git hash made only of digits (e.g. "0055446") would otherwise be parsed
+    // as a huge major number and overflow Int, giving a negative versionCode.
+    if (!Regex("^\\d+\\.\\d+.*").matches(versionName)) {
+        return autoVersion
+    }
+
     val parts = versionName.split(".")
     val major = if (parts.size > 0) parts[0].toIntOrNull() ?: 0 else 0
     val minor = if (parts.size > 1) parts[1].toIntOrNull() ?: 0 else 0
@@ -34,7 +41,8 @@ fun getFixedVersionCode(versionName: String): Int {
         return autoVersion
     }
     
-    return major * 1000000 + minor * 10000 + patch * 100
+    val code = major.toLong() * 1000000L + minor.toLong() * 10000L + patch.toLong() * 100L
+    return if (code in 1L..Int.MAX_VALUE.toLong()) code.toInt() else autoVersion
 }
 
 val downloadedJniLibsPath = "${layout.buildDirectory.get().asFile.path}/downloadedJniLibs"
