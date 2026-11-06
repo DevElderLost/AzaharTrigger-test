@@ -322,17 +322,16 @@ class GamesFragment : Fragment() {
     }
 
     /**
-     * Hitung jumlah kolom grid secara dinamis berdasarkan jumlah game.
-     * Lebar layar dibagi lebar minimum per item (96dp).
-     * Hasilnya di-clamp antara MIN dan MAX, lalu tidak melebihi jumlah game itu sendiri.
+     * Hitung jumlah kolom grid berdasarkan lebar layar.
+     * Lebar layar dibagi lebar minimum per item (72dp), minimal 3 kolom.
+     * Jumlah game sengaja tidak mempengaruhi hasil: kalau kolom dibatasi sebesar jumlah game,
+     * satu game saja akan mengisi seluruh lebar layar dan icon-nya jadi sangat besar.
      */
-    private fun computeGridColumns(gameCount: Int): Int {
+    private fun computeGridColumns(@Suppress("UNUSED_PARAMETER") gameCount: Int): Int {
         val displayMetrics = resources.displayMetrics
         val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
         val itemMinDp = 72f
-        val autoColumns = (screenWidthDp / itemMinDp).toInt().coerceAtLeast(3)
-        // Jangan lebih banyak kolom dari jumlah game (tapi minimal 1)
-        return if (gameCount > 0) autoColumns.coerceAtMost(gameCount) else autoColumns
+        return (screenWidthDp / itemMinDp).toInt().coerceAtLeast(3)
     }
 
     private fun setInsets() =
