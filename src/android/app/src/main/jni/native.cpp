@@ -120,6 +120,11 @@ std::condition_variable running_cv;
 // due to the locking pattern used in RunCitra().
 std::recursive_mutex surface_mutex;
 
+// Points at RunCitra()'s boot-time surface lock while it is held, so the System::Init() callback
+// can release it as soon as the renderer has been built (see RunCitra()). Only touched by the
+// emulation thread.
+static std::unique_lock<std::recursive_mutex>* boot_surface_lock{};
+
 // Signalled by surfaceChanged() whenever s_surface goes from null to non-null. Used by the
 // System::Init() callback to block the renderer (re)creation (initial boot or a
 // savestate load) until a surface actually exists, instead of giving
@@ -263,6 +268,8 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
     // surfaceChanged/surfaceDestroyed callback from the UI thread cannot release or replace
     // s_surface/s_secondary_surface while they're still being used.
     std::unique_lock<std::recursive_mutex> surface_lock(surface_mutex);
+    boot_surface_lock = &surface_lock;
+    SCOPE_EXIT({ boot_surface_lock = nullptr; });
 
     WaitForEmulationSurfaces(surface_lock);
 
@@ -288,6 +295,15 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
             }
         } else {
             surface_mutex.unlock();
+            // Init() is done: the renderer/windows exist and the system is powered on, so any
+            // later surfaceChanged()/surfaceDestroyed() is forwarded to the renderer normally.
+            // Release the boot-time hold here instead of after System::Load() returns. The rest
+            // of Load() (title loading, LayeredFS, cheats...) can take tens of seconds, and
+            // keeping the mutex for all of it blocks the Android UI thread inside the JNI
+            // surface callbacks, which shows the "app is not responding" dialog.
+            if (boot_surface_lock && boot_surface_lock->owns_lock()) {
+                boot_surface_lock->unlock();
+            }
         }
     });
 
@@ -375,8 +391,11 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
     const Core::System::ResultStatus load_result{
         system.Load(*window, filepath, secondary_window.get())};
 
-    // At this point, the surface has already been used, so the mutex can be unlocked.
-    surface_lock.unlock();
+    // At this point, the surface has already been used, so the mutex can be unlocked
+    // (it may already have been released by the init callback above).
+    if (surface_lock.owns_lock()) {
+        surface_lock.unlock();
+    }
 
     if (load_result != Core::System::ResultStatus::Success) {
         return load_result;
