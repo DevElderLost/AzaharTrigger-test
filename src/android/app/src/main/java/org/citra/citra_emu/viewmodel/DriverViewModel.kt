@@ -5,6 +5,7 @@
 package org.citra.citra_emu.viewmodel
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,7 @@ import org.citra.citra_emu.R
 import org.citra.citra_emu.utils.FileUtil.asDocumentFile
 import org.citra.citra_emu.utils.GpuDriverHelper
 import org.citra.citra_emu.utils.GpuDriverMetadata
+import org.citra.citra_emu.utils.Log
 
 class DriverViewModel : ViewModel() {
     val areDriversLoading get() = _areDriversLoading.asStateFlow()
@@ -111,33 +113,43 @@ class DriverViewModel : ViewModel() {
             }
         }
 
-        if (GpuDriverHelper.customDriverData == driverList.value[selectedDriver].second) {
+        val selected = driverList.value.getOrNull(selectedDriver) ?: return
+        if (GpuDriverHelper.customDriverData == selected.second) {
             return
         }
 
         _isDriverReady.value = false
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                if (selectedDriver == 0) {
-                    GpuDriverHelper.installDefaultDriver()
-                    setDriverReady()
-                    return@withContext
-                }
-
-                val driverToInstall = driverList.value[selectedDriver].first.asDocumentFile()
-                if (driverToInstall == null) {
-                    GpuDriverHelper.installDefaultDriver()
-                    return@withContext
-                }
-
-                if (driverToInstall.exists()) {
-                    if (!GpuDriverHelper.installCustomDriverPartial(driverToInstall.uri)) {
+            try {
+                withContext(Dispatchers.IO) {
+                    if (selectedDriver == 0) {
+                        GpuDriverHelper.installDefaultDriver()
                         return@withContext
                     }
-                } else {
-                    GpuDriverHelper.installDefaultDriver()
+
+                    val driverToInstall = selected.first.asDocumentFile()
+                    if (driverToInstall == null || !driverToInstall.exists()) {
+                        GpuDriverHelper.installDefaultDriver()
+                        return@withContext
+                    }
+
+                    // A package that fails to unpack leaves the driver in use as it was.
+                    GpuDriverHelper.installCustomDriverPartial(driverToInstall.uri)
                 }
+            } catch (e: Exception) {
+                Log.error("[DriverViewModel] Failed to switch driver: ${e.message}")
+            } finally {
+                // Always release the loading dialog, whatever the outcome.
                 setDriverReady()
+            }
+
+            // The native driver is loaded once per process; the new one applies on the next start.
+            if (GpuDriverHelper.restartRequired) {
+                Toast.makeText(
+                    CitraApplication.appContext,
+                    R.string.gpu_driver_restart_required,
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }

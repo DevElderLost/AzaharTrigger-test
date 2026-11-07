@@ -160,9 +160,20 @@ class GamesFragment : Fragment() {
         binding.gridGames.apply {
             layoutManager = GridLayoutManager(
                 requireContext(),
-                resources.getInteger(R.integer.game_grid_columns)
+                computeGridColumns(gamesViewModel.games.value.size)
             )
             adapter = this@GamesFragment.gameAdapter
+        }
+
+        // Update spanCount setiap kali daftar game berubah
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                gamesViewModel.games.collectLatest { games ->
+                    val columns = computeGridColumns(games.size)
+                    (binding.gridGames.layoutManager as? GridLayoutManager)
+                        ?.spanCount = columns
+                }
+            }
         }
 
         binding.swipeRefresh.apply {
@@ -302,20 +313,34 @@ class GamesFragment : Fragment() {
         }
     }
 
-    private fun setInsets() = ViewCompat.setOnApplyWindowInsetsListener(
-        binding.root
-    ) { view: View, windowInsets: WindowInsetsCompat ->
-        val barInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-        val cutoutInsets = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
-        val extraListSpacing = resources.getDimensionPixelSize(R.dimen.spacing_large)
-        val spacingNavigation = resources.getDimensionPixelSize(R.dimen.spacing_navigation)
-        val spacingNavigationRail =
-            resources.getDimensionPixelSize(R.dimen.spacing_navigation_rail)
+    /**
+     * Hitung jumlah kolom grid berdasarkan lebar layar.
+     * Lebar layar dibagi lebar minimum per item (72dp), minimal 3 kolom.
+     * Jumlah game sengaja tidak mempengaruhi hasil: kalau kolom dibatasi sebesar jumlah game,
+     * satu game saja akan mengisi seluruh lebar layar dan icon-nya jadi sangat besar.
+     */
+    private fun computeGridColumns(@Suppress("UNUSED_PARAMETER") gameCount: Int): Int {
+        val displayMetrics = resources.displayMetrics
+        val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+        val itemMinDp = 72f
+        return (screenWidthDp / itemMinDp).toInt().coerceAtLeast(3)
+    }
 
-        binding.gridGames.updatePadding(
-            top = barInsets.top + extraListSpacing,
-            bottom = barInsets.bottom + spacingNavigation + extraListSpacing
-        )
+    private fun setInsets() =
+        ViewCompat.setOnApplyWindowInsetsListener(
+            binding.root
+        ) { view: View, windowInsets: WindowInsetsCompat ->
+            val barInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val cutoutInsets = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            val extraListSpacing = resources.getDimensionPixelSize(R.dimen.spacing_large)
+            val spacingNavigation = resources.getDimensionPixelSize(R.dimen.spacing_navigation)
+            val spacingNavigationRail =
+                resources.getDimensionPixelSize(R.dimen.spacing_navigation_rail)
+
+            binding.gridGames.updatePadding(
+                top = barInsets.top + extraListSpacing,
+                bottom = barInsets.bottom + spacingNavigation + extraListSpacing
+            )
 
         binding.swipeRefresh.setProgressViewEndTarget(
             false,
