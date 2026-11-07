@@ -17,7 +17,6 @@ import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
 import org.citra.citra_emu.CitraApplication
 import org.citra.citra_emu.NativeLibrary
-import org.citra.citra_emu.utils.FileUtil.asDocumentFile
 import org.citra.citra_emu.utils.FileUtil.inputStream
 
 object GpuDriverHelper {
@@ -25,6 +24,20 @@ object GpuDriverHelper {
     private var fileRedirectionPath: String? = null
     var driverInstallationPath: String? = null
     private var hookLibPath: String? = null
+
+    /**
+     * The native Vulkan loader (adrenotools) is only ever run once per process, like hakuX, which
+     * loads its driver at game start and never while the app is switching packages. Reloading a
+     * driver in a live process (the old library is still mapped, its hooks still patched in) is
+     * what crashed games when a Turnip package was imported. A change made after the first load
+     * is applied the next time the app starts; [restartRequired] tells the UI so.
+     */
+    @Volatile
+    private var nativeDriverLoaded = false
+
+    @Volatile
+    var restartRequired = false
+        private set
 
     val driverStoragePath: DocumentFile
         get() {
@@ -59,11 +72,23 @@ object GpuDriverHelper {
         // Initialize hook libraries directory.
         hookLibPath = CitraApplication.appContext.applicationInfo.nativeLibraryDir + "/"
 
+        // Never reload the driver in a live process: the change applies on the next start.
+        if (nativeDriverLoaded) {
+            restartRequired = true
+            return
+        }
+        nativeDriverLoaded = true
+
+        // Only hand the native side a library that is really there; a half-installed package
+        // (meta.json without its library) must fall back to the system driver, not crash.
+        val libraryName = customDriverData.libraryName
+            ?.takeIf { it.isNotEmpty() && File(driverInstallationPath + it).isFile }
+
         // Initialize GPU driver.
         NativeLibrary.initializeGpuDriver(
             hookLibPath,
             driverInstallationPath,
-            customDriverData.libraryName,
+            libraryName,
             fileRedirectionPath
         )
     }
@@ -89,29 +114,76 @@ object GpuDriverHelper {
     fun installDefaultDriver() {
         // Removing the installed driver will result in the backend using the default system driver.
         File(driverInstallationPath!!).deleteRecursively()
+        File(driverInstallationPath!!).mkdirs()
         initializeDriverParameters()
     }
 
     fun copyDriverToExternalStorage(driverUri: Uri): DocumentFile? {
-        // Ensure we have directories.
-        initializeDirectories()
+        return try {
+            // Ensure we have directories.
+            initializeDirectories()
 
-        // Copy the zip file URI to user data
-        val copiedFile =
-            FileUtil.copyToExternalStorage(driverUri, driverStoragePath) ?: return null
+            // Check the package where it is, before anything is stored: a bad zip leaves no trace.
+            val metadata = driverUri.inputStream().use { getMetadataFromZip(it) }
+            if (!isUsable(metadata) || !zipHasEntry(driverUri.inputStream(), metadata.libraryName!!)) {
+                return null
+            }
 
-        // Validate driver
-        val metadata = getMetadataFromZip(copiedFile.inputStream())
-        if (metadata.name == null) {
-            copiedFile.delete()
-            return null
+            // Copy the zip file URI to user data
+            FileUtil.copyToExternalStorage(driverUri, driverStoragePath)
+        } catch (e: Exception) {
+            Log.error("[GpuDriverHelper] Failed to import driver: ${e.message}")
+            null
+        }
+    }
+
+    /** A package that names itself and the library to load, and fits this Android version. */
+    private fun isUsable(metadata: GpuDriverMetadata): Boolean =
+        metadata.name != null &&
+            !metadata.libraryName.isNullOrEmpty() &&
+            metadata.minApi <= Build.VERSION.SDK_INT
+
+    private fun zipHasEntry(zipStream: InputStream, entryName: String): Boolean =
+        try {
+            ZipInputStream(BufferedInputStream(zipStream)).use { zis ->
+                var entry: ZipEntry? = zis.nextEntry
+                while (entry != null) {
+                    if (!entry.isDirectory && entry.name == entryName) return true
+                    entry = zis.nextEntry
+                }
+                false
+            }
+        } catch (_: IOException) {
+            false
         }
 
-        if (metadata.minApi > Build.VERSION.SDK_INT) {
-            copiedFile.delete()
-            return null
+    /**
+     * Unpacks a driver beside the one in use and swaps it in only once it is whole (as hakuX
+     * does): a package that fails to unpack, or lacks its library, leaves the driver as it was.
+     */
+    private fun unpackDriver(openZip: () -> InputStream, metadata: GpuDriverMetadata): Boolean {
+        val installDir = File(driverInstallationPath!!)
+        val newDir = File(installDir.parentFile, installDir.name + ".new")
+        newDir.deleteRecursively()
+        newDir.mkdirs()
+        try {
+            FileUtil.unzipToInternalStorage(BufferedInputStream(openZip()), newDir)
+            if (!File(newDir, metadata.libraryName!!).isFile) {
+                throw IOException("Driver package lacks ${metadata.libraryName}")
+            }
+        } catch (e: Exception) {
+            Log.error("[GpuDriverHelper] Failed to unpack driver: ${e.message}")
+            newDir.deleteRecursively()
+            return false
         }
-        return copiedFile
+        installDir.deleteRecursively()
+        if (!newDir.renameTo(installDir)) {
+            Log.error("[GpuDriverHelper] Failed to move the driver into place")
+            newDir.deleteRecursively()
+            installDir.mkdirs()
+            return false
+        }
+        return true
     }
 
     /**
@@ -119,75 +191,36 @@ object GpuDriverHelper {
      * other user data and also unzipped into the installation directory
      */
     fun installCustomDriverComplete(driverUri: Uri): Boolean {
-        // Revert to system default in the event the specified driver is bad.
-        installDefaultDriver()
-
-        // Ensure we have directories.
-        initializeDirectories()
-
-        // Copy the zip file URI to user data
-        val copiedFile =
-            FileUtil.copyToExternalStorage(driverUri, driverStoragePath) ?: return false
-
-        // Validate driver
-        val metadata = getMetadataFromZip(copiedFile.inputStream())
-        if (metadata.name == null) {
-            copiedFile.delete()
-            return false
-        }
-
-        if (metadata.minApi > Build.VERSION.SDK_INT) {
-            copiedFile.delete()
-            return false
-        }
-
-        // Unzip the driver.
-        try {
-            FileUtil.unzipToInternalStorage(
-                BufferedInputStream(copiedFile.inputStream()),
-                File(driverInstallationPath!!)
-            )
-        } catch (e: SecurityException) {
-            return false
-        }
-
-        // Initialize the driver parameters.
-        initializeDriverParameters()
-
-        return true
+        val copiedFile = copyDriverToExternalStorage(driverUri) ?: return false
+        return installCustomDriverPartial(copiedFile.uri)
     }
 
     /**
      * Unzips driver into private installation directory
      */
     fun installCustomDriverPartial(driver: Uri): Boolean {
-        // Revert to system default in the event the specified driver is bad.
-        installDefaultDriver()
+        return try {
+            // Ensure we have directories.
+            initializeDirectories()
 
-        // Ensure we have directories.
-        initializeDirectories()
+            // Validate driver
+            val metadata = driver.inputStream().use { getMetadataFromZip(it) }
+            if (!isUsable(metadata)) {
+                return false
+            }
 
-        // Validate driver
-        val metadata = getMetadataFromZip(driver.inputStream())
-        if (metadata.name == null) {
-            driver.asDocumentFile()?.delete()
-            return false
+            // Unzip beside the driver in use, swapping it in only if the package is whole.
+            if (!unpackDriver({ driver.inputStream() }, metadata)) {
+                return false
+            }
+
+            // Initialize the driver parameters (the native load itself happens once per process).
+            initializeDriverParameters()
+            true
+        } catch (e: Exception) {
+            Log.error("[GpuDriverHelper] Failed to install driver: ${e.message}")
+            false
         }
-
-        // Unzip the driver to the private installation directory
-        try {
-            FileUtil.unzipToInternalStorage(
-                BufferedInputStream(driver.inputStream()),
-                File(driverInstallationPath!!)
-            )
-        } catch (e: SecurityException) {
-            return false
-        }
-
-        // Initialize the driver parameters.
-        initializeDriverParameters()
-
-        return true
     }
 
     /**

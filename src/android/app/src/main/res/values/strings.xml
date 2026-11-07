@@ -61,6 +61,7 @@
     <string name="select_gpu_driver_install_success">Installed %s</string>
     <string name="select_gpu_driver_use_default">Using default GPU driver</string>
     <string name="select_gpu_driver_error">Invalid driver selected, using system default!</string>
+    <string name="gpu_driver_restart_required">GPU driver changed. Restart the app to apply it.</string>
     <string name="system_gpu_driver">System GPU driver</string>
     <string name="installing_driver">Installing driver…</string>
 
@@ -1222,4 +1223,17 @@
     <string name="multiplayer_melon_join_success">Joined LAN room successfully!</string>
     <string name="multiplayer_melon_lobby">DS LAN Lobby</string>
     <string name="multiplayer_close">Close</string>
+
+    <!-- Combo Buttons -->
+
+    <!-- Combo Buttons -->
+    <string name="combo_button_none_assigned">(none)</string>
+    <string name="combo_clear_all">Clear all</string>
+    <string name="combo_button_max_exceeded" formatted="true">Max %d buttons per combo</string>
+    <string name="emulation_combo1_scale">Combo 1 Scale</string>
+    <string name="emulation_combo2_scale">Combo 2 Scale</string>
+    <string name="emulation_combo3_scale">Combo 3 Scale</string>
+    <string name="emulation_combo4_scale">Combo 4 Scale</string>
+    <string name="emulation_combo5_scale">Combo 5 Scale</string>
+    <string name="grid_menu_icon_overlay">Game icon</string>
 </resources>

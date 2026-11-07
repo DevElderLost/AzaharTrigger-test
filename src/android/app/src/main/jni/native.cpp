@@ -120,6 +120,11 @@ std::condition_variable running_cv;
 // due to the locking pattern used in RunCitra().
 std::recursive_mutex surface_mutex;
 
+// Points at RunCitra()'s boot-time surface lock while it is held, so the System::Init() callback
+// can release it as soon as the renderer has been built (see RunCitra()). Only touched by the
+// emulation thread.
+static std::unique_lock<std::recursive_mutex>* boot_surface_lock{};
+
 // Signalled by surfaceChanged() whenever s_surface goes from null to non-null. Used by the
 // System::Init() callback to block the renderer (re)creation (initial boot or a
 // savestate load) until a surface actually exists, instead of giving
@@ -263,6 +268,8 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
     // surfaceChanged/surfaceDestroyed callback from the UI thread cannot release or replace
     // s_surface/s_secondary_surface while they're still being used.
     std::unique_lock<std::recursive_mutex> surface_lock(surface_mutex);
+    boot_surface_lock = &surface_lock;
+    SCOPE_EXIT({ boot_surface_lock = nullptr; });
 
     WaitForEmulationSurfaces(surface_lock);
 
@@ -288,6 +295,15 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
             }
         } else {
             surface_mutex.unlock();
+            // Init() is done: the renderer/windows exist and the system is powered on, so any
+            // later surfaceChanged()/surfaceDestroyed() is forwarded to the renderer normally.
+            // Release the boot-time hold here instead of after System::Load() returns. The rest
+            // of Load() (title loading, LayeredFS, cheats...) can take tens of seconds, and
+            // keeping the mutex for all of it blocks the Android UI thread inside the JNI
+            // surface callbacks, which shows the "app is not responding" dialog.
+            if (boot_surface_lock && boot_surface_lock->owns_lock()) {
+                boot_surface_lock->unlock();
+            }
         }
     });
 
@@ -375,8 +391,11 @@ static Core::System::ResultStatus RunCitra(const std::string& filepath) {
     const Core::System::ResultStatus load_result{
         system.Load(*window, filepath, secondary_window.get())};
 
-    // At this point, the surface has already been used, so the mutex can be unlocked.
-    surface_lock.unlock();
+    // At this point, the surface has already been used, so the mutex can be unlocked
+    // (it may already have been released by the init callback above).
+    if (surface_lock.owns_lock()) {
+        surface_lock.unlock();
+    }
 
     if (load_result != Core::System::ResultStatus::Success) {
         return load_result;
@@ -445,6 +464,14 @@ void InitializeGpuDriver(const std::string& hook_lib_dir, const std::string& cus
                          const std::string& custom_driver_name,
                          const std::string& file_redirect_dir) {
 #if defined(ENABLE_VULKAN) && CITRA_ARCH(arm64)
+    // The driver is loaded once per process. Loading another over a live one (its library still
+    // mapped, adrenotools' hooks still patched in, the renderer holding its function pointers)
+    // crashes the game; a changed driver is picked up on the next start instead.
+    if (vulkan_library && vulkan_library->IsLoaded()) {
+        LOG_WARNING(Frontend, "Vulkan driver already loaded, a new one applies on next start");
+        return;
+    }
+
     void* handle{};
     const char* file_redirect_dir_{};
     int featureFlags{};
@@ -455,11 +482,16 @@ void InitializeGpuDriver(const std::string& hook_lib_dir, const std::string& cus
         file_redirect_dir_ = file_redirect_dir.c_str();
     }
 
-    // Try to load a custom driver.
-    if (custom_driver_name.size()) {
+    // Try to load a custom driver, if its library is really there.
+    if (custom_driver_name.size() &&
+        FileUtil::Exists(custom_driver_dir + custom_driver_name)) {
         handle = adrenotools_open_libvulkan(
             RTLD_NOW, featureFlags | ADRENOTOOLS_DRIVER_CUSTOM, nullptr, hook_lib_dir.c_str(),
             custom_driver_dir.c_str(), custom_driver_name.c_str(), file_redirect_dir_, nullptr);
+        if (!handle) {
+            LOG_WARNING(Frontend, "Custom Vulkan driver {} failed to load, using the system's",
+                        custom_driver_name);
+        }
     }
 
     // Try to load the system driver.
