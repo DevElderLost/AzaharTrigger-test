@@ -464,6 +464,14 @@ void InitializeGpuDriver(const std::string& hook_lib_dir, const std::string& cus
                          const std::string& custom_driver_name,
                          const std::string& file_redirect_dir) {
 #if defined(ENABLE_VULKAN) && CITRA_ARCH(arm64)
+    // The driver is loaded once per process. Loading another over a live one (its library still
+    // mapped, adrenotools' hooks still patched in, the renderer holding its function pointers)
+    // crashes the game; a changed driver is picked up on the next start instead.
+    if (vulkan_library && vulkan_library->IsLoaded()) {
+        LOG_WARNING(Frontend, "Vulkan driver already loaded, a new one applies on next start");
+        return;
+    }
+
     void* handle{};
     const char* file_redirect_dir_{};
     int featureFlags{};
@@ -474,11 +482,16 @@ void InitializeGpuDriver(const std::string& hook_lib_dir, const std::string& cus
         file_redirect_dir_ = file_redirect_dir.c_str();
     }
 
-    // Try to load a custom driver.
-    if (custom_driver_name.size()) {
+    // Try to load a custom driver, if its library is really there.
+    if (custom_driver_name.size() &&
+        FileUtil::Exists(custom_driver_dir + custom_driver_name)) {
         handle = adrenotools_open_libvulkan(
             RTLD_NOW, featureFlags | ADRENOTOOLS_DRIVER_CUSTOM, nullptr, hook_lib_dir.c_str(),
             custom_driver_dir.c_str(), custom_driver_name.c_str(), file_redirect_dir_, nullptr);
+        if (!handle) {
+            LOG_WARNING(Frontend, "Custom Vulkan driver {} failed to load, using the system's",
+                        custom_driver_name);
+        }
     }
 
     // Try to load the system driver.

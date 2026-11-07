@@ -61,6 +61,7 @@
     <string name="select_gpu_driver_install_success">Installed %s</string>
     <string name="select_gpu_driver_use_default">Using default GPU driver</string>
     <string name="select_gpu_driver_error">Invalid driver selected, using system default!</string>
+    <string name="gpu_driver_restart_required">GPU driver changed. Restart the app to apply it.</string>
     <string name="system_gpu_driver">System GPU driver</string>
     <string name="installing_driver">Installing driver…</string>
 

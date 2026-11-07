@@ -528,11 +528,19 @@ object FileUtil {
 
     fun copyToExternalStorage(sourceFile: Uri, destinationDir: DocumentFile): DocumentFile? {
         val filename = getFilename(sourceFile)
-        val destinationFile = destinationDir.createFile("application/zip", filename)!!
-        destinationFile.outputStream().use { os ->
-            sourceFile.inputStream().use { it.copyTo(os) }
+        val destinationFile = destinationDir.createFile("application/zip", filename) ?: return null
+        try {
+            destinationFile.outputStream().use { os ->
+                sourceFile.inputStream().use { it.copyTo(os) }
+            }
+        } catch (e: IOException) {
+            // Don't leave a truncated package in the store.
+            destinationFile.delete()
+            throw e
         }
-        return destinationDir.findFile(filename)
+        // The file just written: findFile(filename) can return an older package of the same name
+        // (createFile renames a duplicate), and the caller would then delete the wrong one.
+        return destinationFile
     }
 
     fun isRootTreeUri(uri: Uri): Boolean {
